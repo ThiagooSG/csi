@@ -1,0 +1,25 @@
+{
+    "name": "backend-csi",
+    "version": "1.0.0",
+    "description": "Backend do Sistema CSI",
+    "main": "src/server.js",
+    "scripts": {
+        "start": "node src/server.js",
+        "dev": "nodemon src/server.js",
+        "generate-hash": "node utils/generate-hash.js"
+    },
+    "dependencies": {
+        "bcrypt": "^5.0.0",
+        "cookie-parser": "^1.4.6",
+        "cors": "^2.8.5",
+        "dotenv": "^16.0.3",
+        "express": "^4.18.2",
+        "jsonwebtoken": "^9.0.0",
+        "nodemailer": "^7.0.5",
+        "oracledb": "^6.8.0",
+        "pg": "^8.8.0"
+    },
+    "devDependencies": {
+        "nodemon": "^3.0.0"
+    }
+}

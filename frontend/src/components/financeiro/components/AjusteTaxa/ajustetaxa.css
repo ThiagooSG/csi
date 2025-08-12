@@ -1,0 +1,127 @@
+.ajuste-taxa-container {
+    max-width: 800px;
+    margin: 0 auto;
+    background: #fff;
+    padding: 2rem 2.5rem;
+    border-radius: 0.75rem;
+    box-shadow: 0 2px 8px rgba(30, 41, 59, 0.08);
+    animation: fadeIn 0.5s ease;
+}
+
+.ajuste-taxa-container h2 {
+    color: #1e293b;
+    margin-bottom: 1.5rem;
+    font-size: 1.6rem;
+    font-weight: 700;
+    letter-spacing: -1px;
+}
+
+.ajuste-taxa-file-input-wrapper {
+    margin-bottom: 1.5rem;
+    display: flex;
+    flex-direction: column;
+}
+
+.ajuste-taxa-file-label {
+    font-size: 1rem;
+    font-weight: 500;
+    color: #334155;
+    margin-bottom: 0.5rem;
+}
+
+.ajuste-taxa-file-input {
+    padding: 10px 14px;
+    font-size: 1rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    background: #f8fafc;
+    width: 100%;
+    max-width: 22rem;
+    transition: border 0.2s;
+}
+
+.ajuste-taxa-file-input:focus {
+    border: 1.5px solid #2563eb;
+    outline: none;
+}
+
+.ajuste-taxa-credit-input {
+    margin-bottom: 1.2rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.ajuste-taxa-credit-input label {
+    color: #334155;
+    font-weight: 500;
+    font-size: 1rem;
+    flex: 1;
+}
+
+.ajuste-taxa-credit-input input[type="number"] {
+    width: 140px;
+    padding: 8px 12px;
+    font-size: 1rem;
+    border-radius: 0.5rem;
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+    transition: border 0.2s;
+}
+
+.ajuste-taxa-credit-input input[type="number"]:focus {
+    border: 1.5px solid #2563eb;
+    outline: none;
+}
+
+.ajuste-taxa-btn {
+    padding: 0.7rem 1.5rem;
+    margin-right: 10px;
+    border: none;
+    border-radius: 0.5rem;
+    background-color: #2563eb;
+    color: white;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: 600;
+    box-shadow: 0 1px 2px rgba(30, 41, 59, 0.04);
+    transition: background 0.2s, transform 0.1s;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.ajuste-taxa-btn:hover {
+    background-color: #1746a0;
+    transform: translateY(-2px) scale(1.03);
+}
+
+.ajuste-taxa-output {
+    background: #f1f5f9;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    max-height: 320px;
+    overflow: auto;
+    white-space: pre-wrap;
+    margin-top: 2rem;
+    font-family: "Fira Mono", "Consolas", monospace;
+    font-size: 0.98rem;
+    color: #334155;
+    box-shadow: 0 1px 2px rgba(30, 41, 59, 0.04);
+}
+
+@media (max-width: 600px) {
+    .ajuste-taxa-container {
+        padding: 1rem 0.5rem;
+    }
+
+    .ajuste-taxa-credit-input {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+
+    .ajuste-taxa-credit-input input[type="number"] {
+        width: 100%;
+    }
+}

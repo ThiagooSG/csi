@@ -1,0 +1,55 @@
+/* Adicionar ao seu CSS global ou criar um arquivo separado */
+
+/* Animação de loading */
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Estilo para componentes de loading */
+.loading-container {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    font-family: Arial, sans-serif;
+}
+
+.loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #3498db;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 10px auto;
+}
+
+.loading-text {
+    font-size: 18px;
+    color: #666;
+    margin-bottom: 20px;
+}
+
+/* Estilo para mensagens de erro */
+.error-message {
+    color: #e74c3c;
+    background-color: #fdf2f2;
+    border: 1px solid #fecaca;
+    border-radius: 4px;
+    padding: 12px;
+    margin: 10px 0;
+    font-size: 14px;
+}
+
+/* Estilo para mensagens de sucesso */
+.success-message {
+    color: #059669;
+    background-color: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 4px;
+    padding: 12px;
+    margin: 10px 0;
+    font-size: 14px;
+}

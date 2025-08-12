@@ -1,0 +1,127 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+    --primary-color: #2563eb;
+    --primary-dark: #1d4ed8;
+    --secondary-color: #64748b;
+    --background-color: #f8fafc;
+    --error-color: #ef4444;
+    --text-color: #1e293b;
+    --border-color: #e2e8f0;
+}
+
+body, html { margin: 0; font-family: 'Inter', sans-serif; background-color: var(--background-color); }
+.login-bg { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%); }
+.login-container { display: flex; background: white; border-radius: 20px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); overflow: hidden; width: 1000px; max-width: 95vw; }
+.login-left { flex: 1; background: linear-gradient(135deg, rgba(37, 99, 235, 0.9) 0%, rgba(14, 165, 233, 0.9) 100%); background-size: cover; padding: 4rem; display: flex; align-items: center; justify-content: center; color: white; }
+.welcome-text h1 { font-size: 2.5rem; margin-bottom: 1rem; font-weight: 700; }
+.welcome-text p { font-size: 1.25rem; opacity: 0.9; }
+.login-right { flex: 1; padding: 3rem; background: white; }
+.login-header { text-align: center; margin-bottom: 2rem; }
+.logo_img { width: 80px; height: 80px; border-radius: 50%; margin-bottom: 1.5rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+.form-group { margin-bottom: 1.5rem; }
+.form-group label { display: block; margin-bottom: 0.5rem; color: var(--text-color); font-weight: 500; }
+
+/* === INÍCIO DA NOVA ESTRUTURA DE ESTILO POLIDO === */
+.input-wrapper {
+    display: flex;
+    align-items: center;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.input-wrapper:focus-within {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.input-icon {
+    padding: 0 1rem; /* Espaçamento horizontal do ícone */
+    color: var(--secondary-color);
+}
+
+.input-wrapper input {
+    flex: 1; /* Faz o campo de texto ocupar o espaço restante */
+    width: 100%;
+    padding: 0.75rem 0.5rem; /* Padding vertical e direito */
+    border: none;
+    outline: none;
+    font-size: 1rem;
+    background-color: transparent; /* Remove o fundo para parecer um único elemento */
+}
+/* === FIM DA NOVA ESTRUTURA DE ESTILO POLIDO === */
+
+.show-password {
+    background: none;
+    border: none;
+    color: var(--secondary-color);
+    cursor: pointer;
+    padding: 0.5rem 1rem; /* Adiciona padding para facilitar o clique */
+}
+
+.login-btn {
+    width: 100%;
+    padding: 0.75rem;
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.login-btn:hover {
+    background-color: var(--primary-dark);
+}
+
+/* ... (resto do CSS pode continuar o mesmo) ... */
+.spinner { width: 20px; height: 20px; border: 2px solid rgba(255, 255, 255, 0.3); border-radius: 50%; border-top-color: white; animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.erro { margin-top: 1rem; padding: 0.75rem; background-color: #fef2f2; color: var(--error-color); border-radius: 8px; text-align: center; font-size: 0.875rem; }
+
+@media (max-width: 768px) {
+    .login-container { flex-direction: column; }
+    .login-left, .login-right { padding: 2rem; }
+    .welcome-text h1 { font-size: 2rem; }
+}
+
+/* Estilo esqueci minha senha */
+.forgot-password-link {
+    display: block;
+    text-align: right;
+    margin-top: -1rem;
+    margin-bottom: 1.5rem;
+    color: var(--primary-color);
+    font-weight: 500;
+    text-decoration: none;
+}
+
+.forgot-password-link:hover {
+    text-decoration: underline;
+}
+
+.feedback-message {
+    margin-top: 1rem;
+    padding: 0.75rem;
+    border-radius: 8px;
+    text-align: center;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.feedback-message.success {
+    background-color: #d1fae5;
+    color: #065f46;
+}
+
+.feedback-message.error {
+    background-color: #fef2f2;
+    color: #991b1b;
+}

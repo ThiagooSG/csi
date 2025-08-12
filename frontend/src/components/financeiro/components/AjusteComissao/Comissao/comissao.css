@@ -1,0 +1,258 @@
+.comissao-form-row {
+    display: flex;
+    gap: 2.2rem;
+    margin-bottom: 1.7rem;
+}
+
+.comissao-form-row.column {
+    flex-direction: column;
+    align-items: center;
+    gap: 0.7rem;
+}
+
+.comissao-form-row.column > label,
+.comissao-form-row.column > .comissao-label {
+    align-self: flex-start;
+}
+
+.comissao-label {
+    font-weight: 600;
+    color: #334155;
+    margin-bottom: 0.4rem;
+    display: block;
+    font-size: 1.08rem;
+}
+
+.comissao-textarea,
+.comissao-input {
+    width: 100%;
+    padding: 16px 18px;
+    font-size: 1.08rem;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 0.8rem;
+    background: #f8fafc;
+    transition: border 0.2s, box-shadow 0.2s;
+    outline: none;
+    margin-bottom: 0.2rem;
+    resize: vertical;
+}
+
+.comissao-textarea {
+    min-height: 110px;
+    max-height: 220px;
+}
+
+.comissao-textarea:focus,
+.comissao-input:focus {
+    border: 1.5px solid #2563eb;
+    box-shadow: 0 0 0 2px #2563eb22;
+}
+
+.comissao-btn-center {
+    display: flex;
+    justify-content: center;
+    margin-top: 0.5rem;
+    margin-bottom: 0; /* Remove espaço extra após botão consultar */
+}
+
+.comissao-btn {
+    padding: 0.7rem 1.7rem;
+    border: none;
+    border-radius: 0.8rem;
+    background-color: #2563eb;
+    color: white;
+    cursor: pointer;
+    font-size: 1.08rem;
+    font-weight: 700;
+    box-shadow: 0 2px 8px rgba(30, 41, 59, 0.07);
+    transition: background 0.2s, transform 0.1s;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.7rem;
+}
+
+.comissao-btn.small {
+    font-size: 1.01rem;
+}
+
+.comissao-btn.limpar {
+    background: #64748b;
+}
+
+.comissao-btn:hover {
+    background-color: #1746a0;
+    transform: translateY(-2px) scale(1.03);
+}
+
+.comissao-btn.limpar:hover {
+    background: #334155;
+}
+
+.comissao-feedback {
+    margin: 1.3rem 0;
+    padding: 1.2rem;
+    border-radius: 0.8rem;
+    font-weight: 600;
+    font-size: 1.08rem;
+    text-align: center;
+}
+
+.comissao-feedback.success {
+    background: #d1fae5;
+    color: #065f46;
+    border: 1.5px solid #10b981;
+}
+
+.comissao-feedback.error {
+    background: #fee2e2;
+    color: #991b1b;
+    border: 1.5px solid #ef4444;
+}
+
+.comissao-table-card {
+    margin-top: 1.1rem; /* Menor espaço após botão consultar */
+    margin-bottom: 2.2rem;
+    background: #f8fafc;
+    padding: 1.5rem 1.1rem;
+    border-radius: 0.8rem;
+    box-shadow: 0 1px 4px rgba(30, 41, 59, 0.06);
+    overflow-x: auto;
+    width: 100%;
+}
+
+.comissao-table-card h3 {
+    margin-top: 0.1rem;
+    margin-bottom: 0.8rem;
+    color: #1e293b;
+    text-align: left;
+    font-size: 1.13rem;
+    font-weight: 700;
+}
+
+.comissao-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.80rem;      /* igual ao comissao-fios */
+    min-width: 620px;
+    table-layout: auto;
+}
+
+.comissao-table th,
+.comissao-table td {
+    padding: 0.15rem 1.2rem;    
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 200px;
+}
+
+.comissao-table th {
+    background: #e0e7ef;
+    color: #334155;
+    font-weight: 700;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    font-size: 1.0rem;
+}
+
+.comissao-table td:first-child {
+    white-space: nowrap;
+    max-width: 120px;
+}
+
+.comissao-table tr:nth-child(even) {
+    background: #f1f5f9;
+}
+
+.comissao-actions {
+    margin-top: 2.5rem;
+    display: flex;
+    gap: 1.5rem;
+    justify-content: center;
+}
+
+.comissao-representantes-container {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.comissao-representante-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 1rem;
+    width: 100%;
+}
+
+.comissao-select-container {
+    flex: 0 0 180px;
+    min-width: 120px;
+    max-width: 180px;
+}
+
+.comissao-percentual-container {
+    flex: 0 0 180px;
+    min-width: 100px;
+    max-width: 180px;
+}
+
+.comissao-select {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    padding: 10px 8px;
+    font-size: 1rem;
+    border-radius: 0.5rem;
+}
+
+.comissao-input-percentual {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    padding: 10px 8px;
+    font-size: 1rem;
+    border-radius: 0.5rem;
+}
+
+.comissao-btn.adicionar {
+    align-self: flex-start;
+    background-color: #059669;
+    margin-top: 0.2rem;
+    padding: 0.5rem 1.2rem;
+    font-size: 1rem;
+}
+
+.comissao-btn.adicionar:hover {
+    background-color: #047857;
+}
+
+@media (max-width: 900px) {
+    .comissao-table {
+        min-width: 0;
+        font-size: 0.98rem;
+    }
+    .comissao-table th,
+    .comissao-table td {
+        font-size: 0.98rem;
+        padding: 0.7rem 0.5rem;
+    }
+}
+
+@media (max-width: 700px) {
+    .comissao-representante-row {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.5rem;
+    }
+    .comissao-select-container,
+    .comissao-percentual-container {
+        min-width: 0;
+        max-width: 100%;
+        flex: 1 1 100%;
+    }
+}
