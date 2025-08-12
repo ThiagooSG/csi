@@ -1,12 +1,14 @@
 import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react-swc";
 
-// https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
   server: {
-    proxy: {
-      "/api": "http://10.10.2.141:3010",
+    host: true,
+    port: 5174, // <-- GARANTA QUE ESTE VALOR SEJA 5174
+    strictPort: true,
+    open: false,
+    cors: true,
+    hmr: {
+      host: "10.10.2.141",
     },
   },
 });
