@@ -38,6 +38,7 @@
     width: 100%;
     max-width: 22rem;
     transition: border 0.2s;
+    margin-bottom: 10px;
 }
 
 .ajuste-taxa-file-input:focus {

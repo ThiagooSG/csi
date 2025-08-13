@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import "./login.css";
-import { login as loginApi } from "../../services/authService";
+import { login as loginApi } from "../../utils/api";
 import { Link } from "react-router-dom";
 
 const Login: React.FC = () => {
@@ -61,7 +61,7 @@ const Login: React.FC = () => {
                 {/* ESTA É A PARTE QUE ESTAVA FALTANDO */}
                 <div className="login-left">
                     <div className="welcome-text">
-                        <h1>Bem-vindos ao CIS</h1>
+                        <h1>Bem-vindos ao CSI</h1>
                         <p>Cataguases Sistemas Integrados</p>
                     </div>
                 </div>

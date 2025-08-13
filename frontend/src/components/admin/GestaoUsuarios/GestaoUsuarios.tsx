@@ -3,12 +3,50 @@ import { ListaUsuarios } from "./ListaUsuarios";
 import { FormUsuario } from "./FormUsuario";
 import { apiGet, apiDelete } from "../../../utils/api";
 import { hasPermission } from "../../../services/authService";
+import { toastService } from "../../../services/toastService";
 import "./gestaousuarios.css";
+
+// --- Sub-Componente: Modal de Confirmação de Exclusão ---
+const ConfirmacaoDeleteModal: React.FC<{
+    onConfirm: () => void;
+    onCancel: () => void;
+    userName: string;
+}> = ({ onConfirm, onCancel, userName }) => {
+    return (
+        <div className="modal-overlay">
+            <div className="modal-content">
+                <div className="modal-header">
+                    <h3>Confirmar Exclusão</h3>
+                    <button onClick={onCancel} className="modal-close-btn">
+                        &times;
+                    </button>
+                </div>
+                <div className="confirmation-body">
+                    <p>Você tem certeza que deseja excluir o usuário:</p>
+                    <p>
+                        <strong>{userName}</strong>?
+                    </p>
+                    <p>Esta ação não pode ser desfeita.</p>
+                </div>
+                <div className="modal-footer">
+                    <button className="gestao-btn secondary" onClick={onCancel}>
+                        Cancelar
+                    </button>
+                    <button className="gestao-btn danger" onClick={onConfirm}>
+                        Sim, Excluir
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 interface Usuario {
     ID_USUARIOS: number;
     NOME_USUARIO: string;
     LOGIN_USUARIO: string;
+    EMAIL: string;
+    SETOR: string;
     ATIVO: number;
     NOME_PERFIL: string;
     ID_PERFIS: number[];
@@ -25,27 +63,33 @@ const GestaoUsuarios: React.FC = () => {
     const [usuarios, setUsuarios] = useState<Usuario[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-
-    // Estados para o formulário modal
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [usuarioSelecionado, setUsuarioSelecionado] = useState<any | null>(
+    const [isFormModalOpen, setIsFormModalOpen] = useState(false);
+    const [usuarioSelecionado, setUsuarioSelecionado] = useState<Usuario | null>(
         null
     );
 
-    // --- NOVOS ESTADOS PARA PAGINAÇÃO E FILTRO ---
+    // Estados agora controlam os parâmetros da API
     const [pagination, setPagination] = useState<Pagination | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [searchTerm, setSearchTerm] = useState("");
-    const [limit, setLimit] = useState(10); // Itens por página
+    const [limit] = useState(10);
 
-    // Função para carregar ou recarregar os usuários com filtros
+    // Estado para o modal de confirmação de exclusão
+    const [isConfirmDeleteModalOpen, setIsConfirmDeleteModalOpen] =
+        useState(false);
+    const [usuarioParaExcluir, setUsuarioParaExcluir] = useState<Usuario | null>(
+        null
+    );
+
+    // Função agora envia os parâmetros para o backend
     const fetchUsuarios = useCallback(
         async (page: number, search: string) => {
             setLoading(true);
             setError(null);
             try {
-                // Constrói a URL com os parâmetros de paginação e busca
-                const url = `/api/usuarios?page=${page}&limit=${limit}&search=${search}`;
+                const url = `/api/usuarios?page=${page}&limit=${limit}&search=${encodeURIComponent(
+                    search
+                )}`;
                 const response = await apiGet<{
                     data: Usuario[];
                     pagination: Pagination;
@@ -66,42 +110,58 @@ const GestaoUsuarios: React.FC = () => {
             }
         },
         [limit]
-    ); // 'limit' é uma dependência
+    );
 
-    // Efeito para buscar os dados quando a página ou o filtro mudam
+    // useEffect agora dispara a busca na API quando a página ou o filtro mudam
     useEffect(() => {
-        // Debounce: espera um pouco após o usuário parar de digitar para fazer a busca
         const handler = setTimeout(() => {
             fetchUsuarios(currentPage, searchTerm);
-        }, 500); // 500ms de espera
+        }, 300); // Debounce de 300ms para a busca
 
         return () => {
-            clearTimeout(handler); // Limpa o timeout se o usuário digitar novamente
+            clearTimeout(handler);
         };
     }, [fetchUsuarios, currentPage, searchTerm]);
 
-    // Funções para controlar o modal (sem alterações)
-    const handleOpenModal = (usuario: any | null) => {
+    const handleOpenModal = (usuario: Usuario | null) => {
         setUsuarioSelecionado(usuario);
-        setIsModalOpen(true);
+        setIsFormModalOpen(true);
     };
     const handleCloseModal = () => {
-        setIsModalOpen(false);
+        setIsFormModalOpen(false);
         setUsuarioSelecionado(null);
     };
     const handleSave = () => {
         handleCloseModal();
+        // Recarrega a página atual para refletir as mudanças
         fetchUsuarios(currentPage, searchTerm);
     };
-    const handleDelete = async (id: number) => {
-        if (window.confirm("Tem certeza que deseja excluir este usuário?")) {
-            const response = await apiDelete(`/api/usuarios/${id}`);
-            if (response.success) {
-                fetchUsuarios(currentPage, searchTerm);
+
+    const handleDelete = (usuario: Usuario) => {
+        setUsuarioParaExcluir(usuario);
+        setIsConfirmDeleteModalOpen(true);
+    };
+
+    const executeDelete = async () => {
+        if (!usuarioParaExcluir) return;
+        const response = await apiDelete(
+            `/api/usuarios/${usuarioParaExcluir.ID_USUARIOS}`
+        );
+        if (response.success) {
+            toastService.success(
+                `Usuário "${usuarioParaExcluir.NOME_USUARIO}" excluído com sucesso!`
+            );
+            // Se o item excluído era o último da página, volta para a página anterior
+            if (usuarios.length === 1 && currentPage > 1) {
+                setCurrentPage(currentPage - 1);
             } else {
-                alert(response.message || "Falha ao excluir usuário.");
+                fetchUsuarios(currentPage, searchTerm);
             }
+        } else {
+            toastService.error(response.message || "Falha ao excluir usuário.");
         }
+        setIsConfirmDeleteModalOpen(false);
+        setUsuarioParaExcluir(null);
     };
 
     return (
@@ -115,7 +175,6 @@ const GestaoUsuarios: React.FC = () => {
                 )}
             </div>
 
-            {/* --- NOVOS CONTROLES DE FILTRO --- */}
             <div className="filter-controls">
                 <input
                     type="text"
@@ -124,7 +183,7 @@ const GestaoUsuarios: React.FC = () => {
                     value={searchTerm}
                     onChange={(e) => {
                         setSearchTerm(e.target.value);
-                        setCurrentPage(1); // Volta para a primeira página ao buscar
+                        setCurrentPage(1);
                     }}
                 />
             </div>
@@ -136,14 +195,15 @@ const GestaoUsuarios: React.FC = () => {
                     <ListaUsuarios
                         usuarios={usuarios}
                         onEdit={handleOpenModal}
-                        onDelete={handleDelete}
+                        onDelete={(id) => {
+                            const user = usuarios.find((u) => u.ID_USUARIOS === id);
+                            if (user) handleDelete(user);
+                        }}
                     />
-
-                    {/* --- NOVOS CONTROLES DE PAGINAÇÃO --- */}
                     {pagination && pagination.totalPages > 1 && (
                         <div className="pagination-controls">
                             <button
-                                onClick={() => setCurrentPage((prev) => prev - 1)}
+                                onClick={() => setCurrentPage((p) => p - 1)}
                                 disabled={pagination.currentPage === 1}
                                 className="gestao-btn"
                             >
@@ -153,7 +213,7 @@ const GestaoUsuarios: React.FC = () => {
                                 Página {pagination.currentPage} de {pagination.totalPages}
                             </span>
                             <button
-                                onClick={() => setCurrentPage((prev) => prev + 1)}
+                                onClick={() => setCurrentPage((p) => p + 1)}
                                 disabled={pagination.currentPage === pagination.totalPages}
                                 className="gestao-btn"
                             >
@@ -164,11 +224,18 @@ const GestaoUsuarios: React.FC = () => {
                 </>
             )}
 
-            {isModalOpen && (
+            {isFormModalOpen && (
                 <FormUsuario
                     usuarioParaEditar={usuarioSelecionado}
                     onClose={handleCloseModal}
                     onSave={handleSave}
+                />
+            )}
+            {isConfirmDeleteModalOpen && usuarioParaExcluir && (
+                <ConfirmacaoDeleteModal
+                    onConfirm={executeDelete}
+                    onCancel={() => setIsConfirmDeleteModalOpen(false)}
+                    userName={usuarioParaExcluir.NOME_USUARIO}
                 />
             )}
         </div>

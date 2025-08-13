@@ -14,58 +14,7 @@
     transition: padding 0.2s, max-width 0.2s;
 }
 
-@media (min-width: 1400px) {
-    .ajuste-comissao-card {
-        max-width: 1300px;
-        padding: 3rem 3rem 2.5rem 3rem;
-    }
-}
-
-@media (min-width: 1200px) and (max-width: 1399px) {
-    .ajuste-comissao-card {
-        max-width: 1100px;
-        padding: 2.5rem 2rem 2rem 2rem;
-    }
-}
-
-@media (max-width: 900px) {
-    .ajuste-comissao-card {
-        max-width: 99vw;
-        padding: 1.2rem 0.5rem;
-        border-radius: 1rem;
-    }
-    .ajuste-comissao-header,
-    .ajuste-comissao-title {
-        font-size: 1.5rem;
-    }
-}
-
-@media (max-width: 600px) {
-    .ajuste-comissao-card {
-        padding: 0.7rem 0.2rem;
-        margin-top: 1rem;
-        border-radius: 0.7rem;
-    }
-    .ajuste-comissao-header,
-    .ajuste-comissao-title {
-        font-size: 1.1rem;
-    }
-    .ajuste-comissao-tabs {
-        flex-direction: column;
-        gap: 0.5rem;
-        margin-bottom: 1rem;
-    }
-    .ajuste-comissao-tabs button {
-        width: 100%;
-        font-size: 1rem;
-        padding: 0.6rem 1rem;
-    }
-    .ajuste-comissao-content {
-        min-height: 40vh;
-    }
-}
-
-/* Mantém o restante do seu CSS */
+/* Mantém o restante do seu CSS para os elementos internos */
 .ajuste-comissao-header {
     display: flex;
     align-items: center;
@@ -116,3 +65,38 @@
     flex-direction: column;
     justify-content: flex-start;
 }
+
+/* Responsividade para telas menores */
+@media (max-width: 900px) {
+    .ajuste-comissao-card {
+        padding: 1.2rem 1rem;
+        border-radius: 1rem;
+    }
+    .ajuste-comissao-header,
+    .ajuste-comissao-title {
+        font-size: 1.5rem;
+    }
+}
+
+@media (max-width: 600px) {
+    .ajuste-comissao-card {
+        padding: 0.7rem;
+        margin-top: 1rem;
+        border-radius: 0.7rem;
+    }
+    .ajuste-comissao-header,
+    .ajuste-comissao-title {
+        font-size: 1.1rem;
+    }
+    .ajuste-comissao-tabs {
+        flex-direction: column;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+    }
+    .ajuste-comissao-tabs button {
+        width: 100%;
+        font-size: 1rem;
+        padding: 0.6rem 1rem;
+    }
+}
+

@@ -1,11 +1,18 @@
-import { 
-    getAccessToken, 
-    refreshToken, 
-    setAccessToken, 
-    logout, 
-    clearAuthData 
+// frontend/src/utils/api.ts
+
+import {
+    getAccessToken,
+    setAccessToken,
+    setUsuario,
+    clearAuthData,
+    Usuario,
 } from "../services/authService";
 
+// URL base da API fica centralizada aqui.
+const API_URL =
+    import.meta.env.VITE_API_URL?.replace(/\/$/, "") || "http://localhost:3011";
+
+// --- Interfaces de Resposta ---
 export interface ApiResponse<T = any> {
     success: boolean;
     data?: T;
@@ -13,68 +20,103 @@ export interface ApiResponse<T = any> {
     error?: string;
 }
 
-// Wrapper para fetch que gerencia JWT automaticamente
-export async function apiFetch(
-    input: RequestInfo | URL, 
-    init: RequestInit = {}
-): Promise<Response> {
-    let token = getAccessToken();
-    let headers: HeadersInit = { 
-        "Content-Type": "application/json",
-        ...(init.headers || {}) 
-    };
+export interface LoginResponse {
+    success: boolean;
+    user?: Usuario;
+    accessToken?: string;
+    message: string;
+}
 
-    // Adicionar token se existir
-    if (token) {
-        headers = { 
-            ...headers, 
-            Authorization: `Bearer ${token}` 
-        };
-    }
+// --- Funções de Autenticação que fazem chamadas de rede ---
 
-    // Primeira tentativa
-    let response = await fetch(input, { 
-        ...init, 
-        headers, 
-        credentials: "include" 
+export async function login(
+    loginStr: string,
+    senha: string
+): Promise<LoginResponse> {
+    const response = await apiPost<LoginResponse>("/api/auth/login", {
+        login: loginStr,
+        senha,
     });
 
-    // Se receber 401 (não autorizado), tentar refresh
-    if (response.status === 401 && token) {
-        console.log('Token expirado, tentando refresh...');
+    if (response.success && response.data?.accessToken && response.data?.user) {
+        setAccessToken(response.data.accessToken);
+        setUsuario(response.data.user);
+    }
+    return response.data as LoginResponse;
+}
 
+export async function logout(): Promise<void> {
+    try {
+        await apiPost("/api/auth/logout", {});
+    } catch (error) {
+        console.error("Erro no logout:", error);
+    } finally {
+        clearAuthData();
+    }
+}
+
+async function refreshToken(): Promise<ApiResponse<{ accessToken: string }>> {
+    return apiPost("/api/auth/refresh", {});
+}
+
+export async function verifyToken(): Promise<boolean> {
+    try {
+        const response = await apiGet("/api/auth/verify");
+        return response.success;
+    } catch {
+        return false;
+    }
+}
+
+// --- Função de Fetch Genérica e Automatizada ---
+
+async function apiFetch(
+    path: string,
+    options: RequestInit = {}
+): Promise<Response> {
+    const fullUrl = `${API_URL}${path}`;
+    let token = getAccessToken();
+
+    const headers = new Headers(options.headers || {});
+    if (!headers.has("Content-Type")) {
+        headers.set("Content-Type", "application/json");
+    }
+    if (token) {
+        headers.set("Authorization", `Bearer ${token}`);
+    }
+
+    let response = await fetch(fullUrl, {
+        ...options,
+        headers,
+        credentials: "include",
+    });
+
+    if (response.status === 401 && token) {
         try {
+            console.log("Token expirado, tentando refresh...");
             const refreshResult = await refreshToken();
 
-            if (refreshResult.success && refreshResult.accessToken) {
-                // Atualizar headers com novo token
-                headers = { 
-                    ...headers, 
-                    Authorization: `Bearer ${refreshResult.accessToken}` 
-                };
-
-                // Tentar novamente com novo token
-                response = await fetch(input, { 
-                    ...init, 
-                    headers, 
-                    credentials: "include" 
+            if (refreshResult.success && refreshResult.data?.accessToken) {
+                setAccessToken(refreshResult.data.accessToken);
+                headers.set(
+                    "Authorization",
+                    `Bearer ${refreshResult.data.accessToken}`
+                );
+                // Tenta a requisição original novamente com o novo token
+                response = await fetch(fullUrl, {
+                    ...options,
+                    headers,
+                    credentials: "include",
                 });
-
-                console.log('Token renovado com sucesso');
             } else {
-                throw new Error('Falha no refresh token');
+                throw new Error("Falha no refresh do token");
             }
         } catch (error) {
-            console.error('Erro no refresh token:', error);
-
-            // Se refresh falhar, fazer logout
-            await logout();
-
-            // Redirecionar para login
-            if (typeof window !== 'undefined') {
+            console.error("Erro no refresh do token:", error);
+            clearAuthData(); // Usa a função importada
+            if (typeof window !== "undefined") {
                 window.location.href = "/";
             }
-
             throw new Error("Sessão expirada. Faça login novamente.");
         }
     }
@@ -82,96 +124,76 @@ export async function apiFetch(
     return response;
 }
 
-// Wrapper para GET requests
+// --- Wrappers para os métodos HTTP (GET, POST, etc.) ---
+
+async function handleApiResponse<T>(
+    response: Response
+): Promise<ApiResponse<T>> {
+    const data = await response.json();
+    return {
+        success: response.ok,
+        data: response.ok ? data : undefined,
+        message: data.message,
+        error: response.ok ? undefined : data.message || "Erro na requisição",
+    };
+}
+
 export async function apiGet<T = any>(url: string): Promise<ApiResponse<T>> {
     try {
-        const response = await apiFetch(url, { method: 'GET' });
-        const data = await response.json();
-
-        return {
-            success: response.ok,
-            data: response.ok ? data : undefined,
-            message: data.message,
-            error: response.ok ? undefined : data.message || 'Erro na requisição'
-        };
+        const response = await apiFetch(url, { method: "GET" });
+        return await handleApiResponse<T>(response);
     } catch (error) {
         return {
             success: false,
-            error: error instanceof Error ? error.message : 'Erro desconhecido'
+            error: error instanceof Error ? error.message : "Erro desconhecido",
         };
     }
 }
 
-// Wrapper para POST requests
 export async function apiPost<T = any>(
-    url: string, 
+    url: string,
     body: any
 ): Promise<ApiResponse<T>> {
     try {
         const response = await apiFetch(url, {
-            method: 'POST',
-            body: JSON.stringify(body)
+            method: "POST",
+            body: JSON.stringify(body),
         });
-
-        const data = await response.json();
-
-        return {
-            success: response.ok,
-            data: response.ok ? data : undefined,
-            message: data.message,
-            error: response.ok ? undefined : data.message || 'Erro na requisição'
-        };
+        return await handleApiResponse<T>(response);
     } catch (error) {
         return {
             success: false,
-            error: error instanceof Error ? error.message : 'Erro desconhecido'
+            error: error instanceof Error ? error.message : "Erro desconhecido",
         };
     }
 }
 
-// Wrapper para PUT requests
 export async function apiPut<T = any>(
-    url: string, 
+    url: string,
     body: any
 ): Promise<ApiResponse<T>> {
     try {
         const response = await apiFetch(url, {
-            method: 'PUT',
-            body: JSON.stringify(body)
+            method: "PUT",
+            body: JSON.stringify(body),
         });
-
-        const data = await response.json();
-
-        return {
-            success: response.ok,
-            data: response.ok ? data : undefined,
-            message: data.message,
-            error: response.ok ? undefined : data.message || 'Erro na requisição'
-        };
+        return await handleApiResponse<T>(response);
     } catch (error) {
         return {
             success: false,
-            error: error instanceof Error ? error.message : 'Erro desconhecido'
+            error: error instanceof Error ? error.message : "Erro desconhecido",
         };
     }
 }
 
-// Wrapper para DELETE requests
 export async function apiDelete<T = any>(url: string): Promise<ApiResponse<T>> {
     try {
-        const response = await apiFetch(url, { method: 'DELETE' });
-        const data = await response.json();
-
-        return {
-            success: response.ok,
-            data: response.ok ? data : undefined,
-            message: data.message,
-            error: response.ok ? undefined : data.message || 'Erro na requisição'
-        };
+        const response = await apiFetch(url, { method: "DELETE" });
+        return await handleApiResponse<T>(response);
     } catch (error) {
         return {
             success: false,
-            error: error instanceof Error ? error.message : 'Erro desconhecido'
+            error: error instanceof Error ? error.message : "Erro desconhecido",
         };
     }
 }

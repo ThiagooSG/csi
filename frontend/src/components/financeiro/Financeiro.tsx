@@ -4,7 +4,8 @@ import AjusteTaxa from "./components/AjusteTaxa/AjusteTaxa";
 import AjustePortador from "./components/AjustePortador/AjustePortador";
 import AjusteComissao from "./components/AjusteComissao/AjusteComissao";
 import "./financeiro.css";
-import { logout } from "../../services/authService";
+// PARA:
+import { logout } from "../../utils/api";
 
 interface Usuario {
   id: number;

@@ -1,11 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
-import {
-    isAuthenticated,
-    verifyToken,
-    clearAuthData,
-} from "../services/authService";
-
+import { isAuthenticated, clearAuthData } from "../services/authService";
+import { verifyToken } from "../utils/api";
 interface PrivateRouteProps {
     children: React.ReactNode;
     adminOnly?: boolean;

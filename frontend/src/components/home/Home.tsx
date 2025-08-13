@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import "./Home.css";
-import { getUsuario, logout, hasPermission } from "../../services/authService";
+import { getUsuario, hasPermission } from "../../services/authService";
+import { logout } from "../../utils/api";
 import type { Usuario } from "../../services/authService";
 
 const Home: React.FC = () => {

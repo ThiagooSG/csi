@@ -1,258 +1,172 @@
-.comissao-form-row {
+/* Layout Principal */
+.comissao-container {
+    width: 100%;
     display: flex;
-    gap: 2.2rem;
-    margin-bottom: 1.7rem;
-}
-
-.comissao-form-row.column {
     flex-direction: column;
-    align-items: center;
-    gap: 0.7rem;
-}
-
-.comissao-form-row.column > label,
-.comissao-form-row.column > .comissao-label {
-    align-self: flex-start;
-}
-
-.comissao-label {
-    font-weight: 600;
-    color: #334155;
-    margin-bottom: 0.4rem;
-    display: block;
-    font-size: 1.08rem;
-}
-
-.comissao-textarea,
-.comissao-input {
-    width: 100%;
-    padding: 16px 18px;
-    font-size: 1.08rem;
-    border: 1.5px solid #e2e8f0;
-    border-radius: 0.8rem;
-    background: #f8fafc;
-    transition: border 0.2s, box-shadow 0.2s;
-    outline: none;
-    margin-bottom: 0.2rem;
-    resize: vertical;
-}
-
-.comissao-textarea {
-    min-height: 110px;
-    max-height: 220px;
-}
-
-.comissao-textarea:focus,
-.comissao-input:focus {
-    border: 1.5px solid #2563eb;
-    box-shadow: 0 0 0 2px #2563eb22;
-}
-
-.comissao-btn-center {
-    display: flex;
-    justify-content: center;
-    margin-top: 0.5rem;
-    margin-bottom: 0; /* Remove espaço extra após botão consultar */
-}
-
-.comissao-btn {
-    padding: 0.7rem 1.7rem;
-    border: none;
-    border-radius: 0.8rem;
-    background-color: #2563eb;
-    color: white;
-    cursor: pointer;
-    font-size: 1.08rem;
-    font-weight: 700;
-    box-shadow: 0 2px 8px rgba(30, 41, 59, 0.07);
-    transition: background 0.2s, transform 0.1s;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.7rem;
-}
-
-.comissao-btn.small {
-    font-size: 1.01rem;
-}
-
-.comissao-btn.limpar {
-    background: #64748b;
-}
-
-.comissao-btn:hover {
-    background-color: #1746a0;
-    transform: translateY(-2px) scale(1.03);
-}
-
-.comissao-btn.limpar:hover {
-    background: #334155;
-}
-
-.comissao-feedback {
-    margin: 1.3rem 0;
-    padding: 1.2rem;
-    border-radius: 0.8rem;
-    font-weight: 600;
-    font-size: 1.08rem;
-    text-align: center;
-}
-
-.comissao-feedback.success {
-    background: #d1fae5;
-    color: #065f46;
-    border: 1.5px solid #10b981;
-}
-
-.comissao-feedback.error {
-    background: #fee2e2;
-    color: #991b1b;
-    border: 1.5px solid #ef4444;
-}
-
-.comissao-table-card {
-    margin-top: 1.1rem; /* Menor espaço após botão consultar */
-    margin-bottom: 2.2rem;
-    background: #f8fafc;
-    padding: 1.5rem 1.1rem;
-    border-radius: 0.8rem;
-    box-shadow: 0 1px 4px rgba(30, 41, 59, 0.06);
-    overflow-x: auto;
-    width: 100%;
-}
-
-.comissao-table-card h3 {
-    margin-top: 0.1rem;
-    margin-bottom: 0.8rem;
-    color: #1e293b;
-    text-align: left;
-    font-size: 1.13rem;
-    font-weight: 700;
-}
-
-.comissao-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.80rem;      /* igual ao comissao-fios */
-    min-width: 620px;
-    table-layout: auto;
-}
-
-.comissao-table th,
-.comissao-table td {
-    padding: 0.15rem 1.2rem;    
-    text-align: left;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 200px;
-}
-
-.comissao-table th {
-    background: #e0e7ef;
-    color: #334155;
-    font-weight: 700;
-    position: sticky;
-    top: 0;
-    z-index: 1;
-    font-size: 1.0rem;
-}
-
-.comissao-table td:first-child {
-    white-space: nowrap;
-    max-width: 120px;
-}
-
-.comissao-table tr:nth-child(even) {
-    background: #f1f5f9;
-}
-
-.comissao-actions {
-    margin-top: 2.5rem;
-    display: flex;
     gap: 1.5rem;
-    justify-content: center;
 }
 
-.comissao-representantes-container {
-    width: 100%;
+.comissao-controles-superiores {
+    display: flex;
+    gap: 2rem;
+    align-items: flex-start;
+}
+
+.comissao-painel-consulta {
+    flex: 3;
     display: flex;
     flex-direction: column;
     gap: 1rem;
-    margin-bottom: 2rem;
+}
+
+.comissao-painel-ajuste {
+    flex: 2;
+    background-color: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+}
+
+.comissao-ajuste-section {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+/* Labels e Inputs */
+.comissao-label {
+    font-weight: 600;
+    color: #334155;
+    margin-bottom: 0.5rem;
+    display: block;
+    font-size: 1rem;
+}
+
+.comissao-textarea {
+    width: 100%;
+    padding: 0.75rem;
+    font-size: 1rem;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 0.5rem;
+    box-sizing: border-box;
+    min-height: 180px;
+    resize: vertical;
+}
+
+/* Botões */
+.comissao-btn {
+    padding: 0.7rem 1.5rem;
+    border: none;
+    border-radius: 0.5rem;
+    color: white;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    transition: background-color 0.2s, transform 0.1s;
+}
+
+.comissao-btn.primary { background-color: #2563eb; }
+.comissao-btn.primary:hover { background-color: #1d4ed8; transform: translateY(-1px); }
+.comissao-btn.secondary { background-color: #64748b; }
+.comissao-btn.secondary:hover { background-color: #475569; transform: translateY(-1px); }
+.comissao-btn.adicionar { background-color: #059669; font-size: 0.9rem; padding: 0.5rem 1rem; align-self: flex-start; }
+.comissao-btn.adicionar:hover { background-color: #047857; }
+.comissao-btn.full-width { width: 100%; }
+.comissao-btn:disabled { background-color: #cbd5e1; cursor: not-allowed; transform: none; }
+
+/* Seção de Representantes no Painel de Ajuste */
+.comissao-representantes-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
 }
 
 .comissao-representante-row {
     display: flex;
-    flex-wrap: wrap;
-    align-items: flex-end;
-    gap: 1rem;
-    width: 100%;
+    gap: 0.8rem;
+    align-items: center;
 }
 
-.comissao-select-container {
-    flex: 0 0 180px;
-    min-width: 120px;
-    max-width: 180px;
-}
-
-.comissao-percentual-container {
-    flex: 0 0 180px;
-    min-width: 100px;
-    max-width: 180px;
+.comissao-select, .comissao-input-percentual {
+    padding: 0.6rem;
+    font-size: 0.95rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
 }
 
 .comissao-select {
-    width: 100%;
-    min-width: 0;
-    box-sizing: border-box;
-    padding: 10px 8px;
-    font-size: 1rem;
-    border-radius: 0.5rem;
+    flex: 3;
 }
-
 .comissao-input-percentual {
-    width: 100%;
-    min-width: 0;
-    box-sizing: border-box;
-    padding: 10px 8px;
-    font-size: 1rem;
-    border-radius: 0.5rem;
+    flex: 2;
+    width: 80px;
 }
 
-.comissao-btn.adicionar {
-    align-self: flex-start;
-    background-color: #059669;
-    margin-top: 0.2rem;
-    padding: 0.5rem 1.2rem;
-    font-size: 1rem;
+/* Tabela de Resultados */
+.comissao-table-card {
+    border: 1px solid #e2e8f0;
+    border-radius: 1rem;
+    overflow: hidden;
+    margin-top: 1rem;
 }
 
-.comissao-btn.adicionar:hover {
-    background-color: #047857;
+.comissao-table-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    background-color: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+}
+.comissao-table-header h3 { margin: 0; font-size: 1.1rem; }
+
+/* CORREÇÃO PONTO 1 e 2: Adiciona scroll horizontal e ajusta espaçamento */
+.comissao-table-wrapper { 
+    overflow-x: auto; /* Adiciona a barra de rolagem horizontal quando necessário */
+    max-height: 60vh; 
+    overflow-y: auto; 
+}
+.comissao-table { width: 100%; border-collapse: collapse; }
+.comissao-table th, .comissao-table td { 
+    padding: 0.8rem 1.2rem;  /* Aumenta o espaçamento lateral */
+    text-align: left; 
+    border-bottom: 1px solid #f1f5f9; 
+    font-size: 0.85rem;
+    white-space: nowrap; /* Impede que o conteúdo quebre a linha */
+}
+.comissao-table th { font-size: 0.75rem; color: #64748b; text-transform: uppercase; background-color: #f8fafc; }
+.comissao-table td { color: #334155; }
+.comissao-table tbody tr:hover { background-color: #f1f5f9; }
+.comissao-table tr.adjusted { background-color: #e2e8f0 !important; color: #94a3b8; }
+.comissao-table tr.adjusted td { color: #94a3b8; }
+
+/* Adicione esta classe ao final de comissao.css se o botão não ficar amarelo */
+.comissao-btn.tertiary { 
+    background-color: #f59e0b; 
+}
+.comissao-btn.tertiary:hover { 
+    background-color: #d97706; 
 }
 
+/* Botão de trava duplicata */
+.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0, 0, 0, 0.6); display: flex; justify-content: center; align-items: center; z-index: 1000; }
+.modal-content { background-color: #fff; padding: 2rem; border-radius: 1rem; width: 100%; max-width: 500px; }
+.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+.modal-header h3 { margin: 0; font-size: 1.5rem; }
+.modal-close-btn { background: none; border: none; font-size: 2rem; cursor: pointer; }
+.release-list { max-height: 300px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 0.5rem; padding: 0.5rem; }
+.release-item { display: flex; align-items: center; padding: 0.5rem; }
+.release-item input { margin-right: 0.75rem; }
+.modal-footer { display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1.5rem; }
+
+
+/* Responsividade */
 @media (max-width: 900px) {
-    .comissao-table {
-        min-width: 0;
-        font-size: 0.98rem;
-    }
-    .comissao-table th,
-    .comissao-table td {
-        font-size: 0.98rem;
-        padding: 0.7rem 0.5rem;
-    }
-}
-
-@media (max-width: 700px) {
-    .comissao-representante-row {
+    .comissao-controles-superiores {
         flex-direction: column;
-        align-items: stretch;
-        gap: 0.5rem;
-    }
-    .comissao-select-container,
-    .comissao-percentual-container {
-        min-width: 0;
-        max-width: 100%;
-        flex: 1 1 100%;
     }
 }

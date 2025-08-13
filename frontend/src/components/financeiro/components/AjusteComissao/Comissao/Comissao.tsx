@@ -1,7 +1,9 @@
 import React, { useState } from "react";
 import { apiPost } from "../../../../../utils/api";
+import { toastService } from "../../../../../services/toastService";
 import "./comissao.css";
 
+// --- Interfaces ---
 interface Duplicata {
     num_docum: string;
     cod_empresa: string;
@@ -30,15 +32,120 @@ const REPRESENTANTE_OPTIONS = [
     "Representante 3",
 ];
 
+// --- Sub-Componente: Modal para Liberar Duplicatas ---
+const ModalLiberarDuplicatas: React.FC<{
+    ajustadas: string[];
+    onClose: () => void;
+    onLiberarTodas: () => void;
+    onLiberarSelecionadas: (selecionadas: Set<string>) => void;
+}> = ({ ajustadas, onClose, onLiberarTodas, onLiberarSelecionadas }) => {
+    const [selecionadas, setSelecionadas] = useState<Set<string>>(new Set());
+
+    const handleSelect = (num_docum: string, isChecked: boolean) => {
+        const novaSelecao = new Set(selecionadas);
+        if (isChecked) novaSelecao.add(num_docum);
+        else novaSelecao.delete(num_docum);
+        setSelecionadas(novaSelecao);
+    };
+
+    return (
+        <div className="modal-overlay">
+            <div className="modal-content">
+                <div className="modal-header">
+                    <h3>Liberar Duplicatas Ajustadas</h3>
+                    <button onClick={onClose} className="modal-close-btn">
+                        &times;
+                    </button>
+                </div>
+                <div className="release-list">
+                    {ajustadas.map((dup) => (
+                        <div key={dup} className="release-item">
+                            <input
+                                type="checkbox"
+                                id={`release-${dup}`}
+                                onChange={(e) => handleSelect(dup, e.target.checked)}
+                            />
+                            <label htmlFor={`release-${dup}`}>{dup}</label>
+                        </div>
+                    ))}
+                </div>
+                <div className="modal-footer">
+                    <button className="comissao-btn secondary" onClick={onLiberarTodas}>
+                        Liberar Todas
+                    </button>
+                    <button
+                        className="comissao-btn primary"
+                        onClick={() => onLiberarSelecionadas(selecionadas)}
+                        disabled={selecionadas.size === 0}
+                    >
+                        Liberar ({selecionadas.size}) Selecionadas
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// --- Sub-Componente: Modal de Confirmação de Ajuste ---
+const ConfirmacaoAjusteModal: React.FC<{
+    onConfirm: () => void;
+    onCancel: () => void;
+    count: number;
+    representantes: Representante[];
+}> = ({ onConfirm, onCancel, count, representantes }) => {
+    return (
+        <div className="modal-overlay">
+            <div className="modal-content">
+                <div className="modal-header">
+                    <h3>Confirmar Ajuste de Comissão</h3>
+                    <button onClick={onCancel} className="modal-close-btn">
+                        &times;
+                    </button>
+                </div>
+                <div className="confirmation-body">
+                    <p>
+                        Você tem certeza que deseja ajustar{" "}
+                        <strong>{count} duplicata(s)</strong> com as seguintes comissões?
+                    </p>
+                    <ul>
+                        {representantes
+                            .filter((r) => r.tipo && r.percentual)
+                            .map((r) => (
+                                <li key={r.id}>
+                                    <strong>{r.tipo}:</strong> {r.percentual}%
+                                </li>
+                            ))}
+                    </ul>
+                </div>
+                <div className="modal-footer">
+                    <button className="comissao-btn secondary" onClick={onCancel}>
+                        Não
+                    </button>
+                    <button className="comissao-btn primary" onClick={onConfirm}>
+                        Sim, Confirmar
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// --- Componente Principal ---
 const Comissao: React.FC = () => {
     const [consultaInput, setConsultaInput] = useState("");
-    const [ajusteInput, setAjusteInput] = useState("");
     const [duplicatas, setDuplicatas] = useState<Duplicata[]>([]);
+    const [duplicatasSelecionadas, setDuplicatasSelecionadas] = useState<
+        Set<string>
+    >(new Set());
+    const [duplicatasAjustadas, setDuplicatasAjustadas] = useState<Set<string>>(
+        new Set()
+    );
     const [loading, setLoading] = useState(false);
-    const [feedback, setFeedback] = useState<any>(null);
     const [representantes, setRepresentantes] = useState<Representante[]>([
-        { id: 1, percentual: "", tipo: "" },
+        { id: 1, percentual: "", tipo: "Representante 1" },
     ]);
+    const [isReleaseModalOpen, setIsReleaseModalOpen] = useState(false);
+    const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
 
     const getAvailableOptions = (currentId: number) => {
         const selecionados = representantes
@@ -49,131 +156,138 @@ const Comissao: React.FC = () => {
     };
 
     const handlePesquisar = async () => {
-        setFeedback(null);
         setDuplicatas([]);
+        setDuplicatasSelecionadas(new Set());
         const duplicatasConsulta = consultaInput
             .split(/[\n,]+/)
             .map((d) => d.trim())
-            .filter((d) => d.length > 0);
-
-        if (duplicatasConsulta.length === 0) {
-            setFeedback({
-                type: "error",
-                message: "Informe duplicatas para pesquisar.",
-            });
-            return;
-        }
+            .filter(Boolean);
+        if (duplicatasConsulta.length === 0) return;
 
         setLoading(true);
         try {
             const response = await apiPost("/api/comissao/pesquisar", {
                 duplicatas: duplicatasConsulta,
             });
+            if (response.success && response.data?.rows) {
+                const encontradas = response.data.encontradas?.length || 0;
+                const naoEncontradas = response.data.nao_encontradas?.length || 0;
+                toastService.success(`${encontradas} duplicata(s) encontrada(s).`);
+                if (naoEncontradas > 0)
+                    toastService.warn(`${naoEncontradas} não encontrada(s).`);
 
-            console.log("Resposta completa da API:", response);
-
-            if (response.success) {
-                // Acessar os dados na estrutura correta: response.data.rows
-                const duplicatasEncontradas = Array.isArray(response.data?.rows)
-                    ? response.data.rows
-                    : Array.isArray(response.rows)
-                        ? response.rows
-                        : Array.isArray(response.data)
-                            ? response.data
-                            : [];
-
-                console.log("Duplicatas encontradas:", duplicatasEncontradas);
-                console.log("Quantidade de duplicatas:", duplicatasEncontradas.length);
-
+                const duplicatasEncontradas = response.data.rows;
                 setDuplicatas(duplicatasEncontradas);
-                setFeedback({
-                    type: "success",
-                    encontradas:
-                        response.data?.encontradas ||
-                        duplicatasEncontradas.map((d: Duplicata) => d.num_docum),
-                    nao_encontradas: response.data?.nao_encontradas || [],
-                });
+                const numerosDaNovaConsulta = new Set(
+                    duplicatasEncontradas.map((d) => d.num_docum)
+                );
+                setDuplicatasAjustadas(
+                    (prev) =>
+                        new Set([...prev].filter((dup) => numerosDaNovaConsulta.has(dup)))
+                );
             } else {
-                setFeedback({
-                    type: "error",
-                    message: response.message || "Erro na pesquisa.",
-                });
+                toastService.error(response.message || "Nenhuma duplicata encontrada.");
+                setDuplicatasAjustadas(new Set());
             }
         } catch (err) {
+            toastService.error("Erro de conexão ao pesquisar.");
             console.error("Erro na requisição:", err);
-            setFeedback({
-                type: "error",
-                message: "Erro ao conectar com o servidor.",
-            });
         }
         setLoading(false);
     };
 
-    const handleAjustarComissao = async () => {
-        setFeedback(null);
-        const duplicatasAjuste = ajusteInput
-            .split(/[\n,]+/)
-            .map((d) => d.trim())
-            .filter((d) => d.length > 0);
-        const repsSelecionados = representantes.filter(
+    const handleAjustarComissao = () => {
+        const repsValidos = representantes.filter(
             (rep) => rep.tipo && rep.percentual
         );
-        if (repsSelecionados.length === 0 || duplicatasAjuste.length === 0) {
-            setFeedback({
-                type: "error",
-                message:
-                    "Informe duplicatas e ao menos um representante com percentual.",
-            });
-            return;
+        if (duplicatasSelecionadas.size > 0 && repsValidos.length > 0) {
+            setIsConfirmModalOpen(true);
+        } else {
+            toastService.error(
+                "Selecione duplicatas e preencha ao menos um representante."
+            );
         }
+    };
+
+    const executeAjuste = async () => {
+        setIsConfirmModalOpen(false);
+        const duplicatasParaAjustar = Array.from(duplicatasSelecionadas);
+        const repsValidos = representantes.filter(
+            (rep) => rep.tipo && rep.percentual
+        );
+
         setLoading(true);
         try {
             const response = await apiPost("/api/comissao/ajustar", {
-                duplicatas: duplicatasAjuste,
-                representantes: repsSelecionados.map((rep) => ({
-                    tipo: rep.tipo,
-                    percentual: rep.percentual,
-                })),
+                duplicatas: duplicatasParaAjustar,
+                representantes: repsValidos,
             });
-            if (response.success) {
-                setFeedback({
-                    type: "success",
-                    alteradas: response.data.alteradas,
-                    nao_encontradas: response.data.nao_encontradas,
-                });
-                setAjusteInput("");
-                setRepresentantes([{ id: 1, percentual: "", tipo: "" }]);
+
+            if (response.success && response.data?.alteradas) {
+                toastService.success(
+                    `${response.data.alteradas.length} duplicata(s) ajustada(s)!`
+                );
+                setDuplicatasAjustadas(
+                    (prev) => new Set([...prev, ...response.data.alteradas])
+                );
+                setDuplicatasSelecionadas(new Set());
             } else {
-                setFeedback({
-                    type: "error",
-                    message: response.message || "Erro ao ajustar.",
-                });
+                toastService.error(response.message || "Falha no ajuste.");
             }
         } catch (err) {
-            setFeedback({
-                type: "error",
-                message: "Erro ao conectar com o servidor.",
-            });
+            toastService.error("Erro de conexão ao ajustar.");
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
+    };
+
+    const handleLiberarTodas = () => {
+        setDuplicatasAjustadas(new Set());
+        setIsReleaseModalOpen(false);
+    };
+
+    const handleLiberarSelecionadas = (selecionadas: Set<string>) => {
+        const novasAjustadas = new Set(duplicatasAjustadas);
+        for (const dup of selecionadas) novasAjustadas.delete(dup);
+        setDuplicatasAjustadas(novasAjustadas);
+        setIsReleaseModalOpen(false);
     };
 
     const handleLimpar = () => {
         setConsultaInput("");
-        setAjusteInput("");
-        setRepresentantes([{ id: 1, percentual: "", tipo: "" }]);
+        setRepresentantes([{ id: 1, percentual: "", tipo: "Representante 1" }]);
         setDuplicatas([]);
-        setFeedback(null);
+        setDuplicatasSelecionadas(new Set());
+        setDuplicatasAjustadas(new Set());
+    };
+
+    const handleSelectAll = () => {
+        const duplicatasParaSelecionar = duplicatas.filter(
+            (d) => !duplicatasAjustadas.has(d.num_docum)
+        );
+        const allSelected =
+            duplicatasSelecionadas.size === duplicatasParaSelecionar.length &&
+            duplicatasParaSelecionar.length > 0;
+        if (allSelected) setDuplicatasSelecionadas(new Set());
+        else
+            setDuplicatasSelecionadas(
+                new Set(duplicatasParaSelecionar.map((d) => d.num_docum))
+            );
+    };
+
+    const handleSelectRow = (num_docum: string, isChecked: boolean) => {
+        const novaSelecao = new Set(duplicatasSelecionadas);
+        if (isChecked) novaSelecao.add(num_docum);
+        else novaSelecao.delete(num_docum);
+        setDuplicatasSelecionadas(novaSelecao);
     };
 
     const adicionarRepresentante = () => {
-        if (representantes.length < 3) {
-            const novoId = (representantes[representantes.length - 1]?.id || 0) + 1;
+        if (representantes.length < 3)
             setRepresentantes([
                 ...representantes,
-                { id: novoId, percentual: "", tipo: "" },
+                { id: Date.now(), percentual: "", tipo: "" },
             ]);
-        }
     };
 
     const atualizarRepresentante = (
@@ -188,58 +302,169 @@ const Comissao: React.FC = () => {
         );
     };
 
+    const duplicatasParaSelecionar = duplicatas.filter(
+        (d) => !duplicatasAjustadas.has(d.num_docum)
+    );
+    const allSelectableChecked =
+        duplicatasParaSelecionar.length > 0 &&
+        duplicatasSelecionadas.size === duplicatasParaSelecionar.length;
+
     return (
-        <>
-            {/* Consulta de duplicatas */}
-            <div className="comissao-form-row column">
-                <label className="comissao-label" htmlFor="consulta-duplicatas">
-                    Consultar Duplicatas
-                </label>
-                <textarea
-                    id="consulta-duplicatas"
-                    value={consultaInput}
-                    onChange={(e) => setConsultaInput(e.target.value)}
-                    placeholder="Informe os números separados por vírgula ou quebra de linha"
-                    rows={5}
-                    className="comissao-textarea"
-                    disabled={loading}
-                    style={{ minHeight: 110, maxHeight: 220 }}
-                />
-                <div className="comissao-btn-center">
+        <div className="comissao-container">
+            <div className="comissao-controles-superiores">
+                <div className="comissao-painel-consulta">
+                    <label className="comissao-label" htmlFor="consulta-duplicatas">
+                        Consultar Duplicatas
+                    </label>
+                    <textarea
+                        id="consulta-duplicatas"
+                        value={consultaInput}
+                        onChange={(e) => setConsultaInput(e.target.value)}
+                        placeholder="Informe os números separados por vírgula ou quebra de linha"
+                        className="comissao-textarea"
+                        disabled={loading}
+                    />
                     <button
-                        className="comissao-btn small"
+                        className="comissao-btn primary"
                         onClick={handlePesquisar}
-                        disabled={loading || !consultaInput}
-                        type="button"
+                        disabled={loading || !consultaInput.trim()}
                     >
                         <i className="fas fa-search"></i> Consultar
                     </button>
                 </div>
 
-                {/* Tabela de duplicatas - AGORA DENTRO DO MESMO BLOCO DO BOTÃO CONSULTAR */}
-                {duplicatas.length > 0 && (
-                    <div className="comissao-table-card">
-                        <h3>Duplicatas Encontradas ({duplicatas.length})</h3>
-                        <div className="comissao-table-container">
-                            <table className="comissao-table">
-                                <thead>
-                                    <tr>
-                                        <th>Nº Duplicata</th>
-                                        <th>Empresa</th>
-                                        <th>Cliente</th>
-                                        <th>Rep. 1</th>
-                                        <th>% Com. 1</th>
-                                        <th>Rep. 2</th>
-                                        <th>% Com. 2</th>
-                                        <th>Rep. 3</th>
-                                        <th>% Com. 3</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {duplicatas.map((d, index) => (
-                                        <tr key={`${d.num_docum}-${index}`}>
+                <div className="comissao-painel-ajuste">
+                    <div className="comissao-ajuste-section">
+                        <label className="comissao-label">Representantes para Ajuste</label>
+                        <div className="comissao-representantes-container">
+                            {representantes.map((rep) => (
+                                <div key={rep.id} className="comissao-representante-row">
+                                    <select
+                                        className="comissao-select"
+                                        value={rep.tipo}
+                                        onChange={(e) =>
+                                            atualizarRepresentante(rep.id, "tipo", e.target.value)
+                                        }
+                                        disabled={loading}
+                                    >
+                                        <option value="">Selecione...</option>
+                                        {getAvailableOptions(rep.id).map((opt) => (
+                                            <option key={opt} value={opt}>
+                                                {opt}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <input
+                                        type="number"
+                                        value={rep.percentual}
+                                        onChange={(e) =>
+                                            atualizarRepresentante(
+                                                rep.id,
+                                                "percentual",
+                                                e.target.value
+                                            )
+                                        }
+                                        placeholder="%"
+                                        className="comissao-input-percentual"
+                                        disabled={loading || !rep.tipo}
+                                        min={0}
+                                        step={0.01}
+                                    />
+                                </div>
+                            ))}
+                            {representantes.length < 3 && (
+                                <button
+                                    className="comissao-btn adicionar"
+                                    onClick={adicionarRepresentante}
+                                    disabled={loading}
+                                >
+                                    <i className="fas fa-plus"></i> Adicionar
+                                </button>
+                            )}
+                        </div>
+                        <hr />
+                        <button
+                            className="comissao-btn primary full-width"
+                            onClick={handleAjustarComissao}
+                            disabled={
+                                loading ||
+                                duplicatasSelecionadas.size === 0 ||
+                                representantes.filter((r) => r.tipo && r.percentual).length ===
+                                0
+                            }
+                        >
+                            <i className="fas fa-exchange-alt"></i> Ajustar (
+                            {duplicatasSelecionadas.size}) Selecionada(s)
+                        </button>
+                        <button
+                            className="comissao-btn secondary full-width"
+                            onClick={handleLimpar}
+                            disabled={loading}
+                        >
+                            <i className="fas fa-eraser"></i> Limpar Tudo
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {duplicatas.length > 0 && (
+                <div className="comissao-table-card">
+                    <div className="comissao-table-header">
+                        <h3>
+                            Duplicatas Encontradas ({duplicatas.length}) | Selecionadas (
+                            {duplicatasSelecionadas.size}) | Ajustadas (
+                            {duplicatasAjustadas.size})
+                        </h3>
+                        {duplicatasAjustadas.size > 0 && (
+                            <button
+                                className="comissao-btn tertiary"
+                                onClick={() => setIsReleaseModalOpen(true)}
+                            >
+                                <i className="fas fa-unlock"></i> Liberar Duplicatas
+                            </button>
+                        )}
+                    </div>
+                    <div className="comissao-table-wrapper">
+                        <table className="comissao-table">
+                            <thead>
+                                <tr>
+                                    <th>
+                                        <input
+                                            type="checkbox"
+                                            onChange={handleSelectAll}
+                                            checked={allSelectableChecked}
+                                            disabled={duplicatasParaSelecionar.length === 0}
+                                        />
+                                    </th>
+                                    <th>Nº Duplicata</th>
+                                    <th>Cliente</th>
+                                    <th>Rep. 1</th>
+                                    <th>% Com. 1</th>
+                                    <th>Rep. 2</th>
+                                    <th>% Com. 2</th>
+                                    <th>Rep. 3</th>
+                                    <th>% Com. 3</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {duplicatas.map((d, index) => {
+                                    const isAdjusted = duplicatasAjustadas.has(d.num_docum);
+                                    return (
+                                        <tr
+                                            key={`${d.num_docum}-${index}`}
+                                            className={isAdjusted ? "adjusted" : ""}
+                                        >
+                                            <td>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={duplicatasSelecionadas.has(d.num_docum)}
+                                                    onChange={(e) =>
+                                                        handleSelectRow(d.num_docum, e.target.checked)
+                                                    }
+                                                    disabled={isAdjusted}
+                                                />
+                                            </td>
                                             <td>{d.num_docum}</td>
-                                            <td>{d.cod_empresa}</td>
                                             <td title={d.nome_cliente}>{d.nome_cliente}</td>
                                             <td title={d.nome_repres_1 || ""}>
                                                 {d.nome_repres_1?.trim() || "-"}
@@ -254,217 +479,31 @@ const Comissao: React.FC = () => {
                                             </td>
                                             <td>{d.pct_comis_3 || 0}%</td>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                )}
-            </div>
-
-            {/* Duplicatas para ajuste */}
-            <div className="comissao-form-row column">
-                <label className="comissao-label" htmlFor="ajuste-duplicatas">
-                    Duplicatas para Ajuste
-                </label>
-                <textarea
-                    id="ajuste-duplicatas"
-                    value={ajusteInput}
-                    onChange={(e) => setAjusteInput(e.target.value)}
-                    placeholder="Cole ou digite aqui apenas as duplicatas que deseja ajustar"
-                    rows={5}
-                    className="comissao-textarea"
-                    disabled={loading}
-                    style={{ minHeight: 110, maxHeight: 220 }}
-                />
-            </div>
-
-            {/* Representantes e Percentuais */}
-            <div className="comissao-representantes-container">
-                {representantes.map((rep) => (
-                    <div key={rep.id} className="comissao-representante-row">
-                        <div className="comissao-select-container">
-                            <label className="comissao-label">Representante</label>
-                            <select
-                                className="comissao-select"
-                                value={rep.tipo}
-                                onChange={(e) =>
-                                    atualizarRepresentante(rep.id, "tipo", e.target.value)
-                                }
-                                disabled={loading}
-                            >
-                                <option value="">Selecione...</option>
-                                {getAvailableOptions(rep.id).map((opt) => (
-                                    <option key={opt} value={opt}>
-                                        {opt}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                        <div className="comissao-percentual-container">
-                            <label className="comissao-label">Percentual (%)</label>
-                            <input
-                                type="number"
-                                value={rep.percentual}
-                                onChange={(e) =>
-                                    atualizarRepresentante(rep.id, "percentual", e.target.value)
-                                }
-                                placeholder="Ex: 1.5"
-                                className="comissao-input-percentual"
-                                disabled={loading || !rep.tipo}
-                                min={0}
-                                step={0.01}
-                            />
-                        </div>
-                    </div>
-                ))}
-                {representantes.length < 3 && (
-                    <button
-                        className="comissao-btn adicionar"
-                        onClick={adicionarRepresentante}
-                        disabled={loading}
-                        type="button"
-                    >
-                        <i className="fas fa-plus"></i> Adicionar Representante
-                    </button>
-                )}
-            </div>
-
-            {/* Botões finais */}
-            <div className="comissao-actions">
-                <button
-                    className="comissao-btn"
-                    onClick={handleAjustarComissao}
-                    disabled={
-                        loading ||
-                        !ajusteInput ||
-                        representantes.filter((rep) => rep.tipo && rep.percentual)
-                            .length === 0
-                    }
-                    type="button"
-                >
-                    <i className="fas fa-exchange-alt"></i> Ajustar Comissão
-                </button>
-                <button
-                    className="comissao-btn limpar"
-                    onClick={handleLimpar}
-                    disabled={loading}
-                    type="button"
-                >
-                    <i className="fas fa-eraser"></i> Limpar
-                </button>
-            </div>
-
-            {/* Feedback movido para o final da página */}
-            {feedback && (
-                <div className={`comissao-feedback ${feedback.type}`}>
-                    <div>
-                        {feedback.type === "error" && feedback.message}
-
-                        {feedback.type === "success" && (
-                            <>
-                                {typeof feedback.encontradas !== "undefined" ? (
-                                    <>
-                                        {feedback.encontradas &&
-                                            feedback.encontradas.length > 0 && (
-                                                <>
-                                                    <strong>
-                                                        {feedback.encontradas.length} duplicata(s)
-                                                        encontrada(s):
-                                                    </strong>
-                                                    <ul style={{ margin: 0, paddingLeft: 18 }}>
-                                                        {feedback.encontradas.map((d: string) => (
-                                                            <li key={`consulta-enc-${d}`}>{d}</li>
-                                                        ))}
-                                                    </ul>
-                                                </>
-                                            )}
-                                        {feedback.nao_encontradas &&
-                                            feedback.nao_encontradas.length > 0 && (
-                                                <>
-                                                    {feedback.encontradas &&
-                                                        feedback.encontradas.length > 0 && <br />}
-                                                    <strong>
-                                                        {feedback.nao_encontradas.length} duplicata(s) não
-                                                        encontrada(s):
-                                                    </strong>
-                                                    <ul
-                                                        style={{
-                                                            margin: 0,
-                                                            paddingLeft: 18,
-                                                            color: "#991b1b",
-                                                        }}
-                                                    >
-                                                        {feedback.nao_encontradas.map((d: string) => (
-                                                            <li key={`consulta-naoenc-${d}`}>{d}</li>
-                                                        ))}
-                                                    </ul>
-                                                </>
-                                            )}
-                                        {(!feedback.encontradas ||
-                                            feedback.encontradas.length === 0) &&
-                                            (!feedback.nao_encontradas ||
-                                                feedback.nao_encontradas.length === 0) && (
-                                                <span>
-                                                    Nenhuma informação de duplicata retornada pela
-                                                    consulta.
-                                                </span>
-                                            )}
-                                    </>
-                                ) : typeof feedback.alteradas !== "undefined" ? (
-                                    <>
-                                        {feedback.alteradas && feedback.alteradas.length > 0 && (
-                                            <>
-                                                <strong>
-                                                    {feedback.alteradas.length} duplicata(s) alterada(s)
-                                                    com sucesso:
-                                                </strong>
-                                                <ul style={{ margin: 0, paddingLeft: 18 }}>
-                                                    {feedback.alteradas.map((d: string) => (
-                                                        <li key={`ajuste-alt-${d}`}>{d}</li>
-                                                    ))}
-                                                </ul>
-                                            </>
-                                        )}
-                                        {feedback.nao_encontradas &&
-                                            feedback.nao_encontradas.length > 0 && (
-                                                <>
-                                                    {feedback.alteradas &&
-                                                        feedback.alteradas.length > 0 && <br />}
-                                                    <strong>
-                                                        {feedback.nao_encontradas.length} duplicata(s) não
-                                                        encontrada(s) para ajuste:
-                                                    </strong>
-                                                    <ul
-                                                        style={{
-                                                            margin: 0,
-                                                            paddingLeft: 18,
-                                                            color: "#991b1b",
-                                                        }}
-                                                    >
-                                                        {feedback.nao_encontradas.map((d: string) => (
-                                                            <li key={`ajuste-naoenc-${d}`}>{d}</li>
-                                                        ))}
-                                                    </ul>
-                                                </>
-                                            )}
-                                        {(!feedback.alteradas || feedback.alteradas.length === 0) &&
-                                            (!feedback.nao_encontradas ||
-                                                feedback.nao_encontradas.length === 0) && (
-                                                <span>
-                                                    Ajuste processado. Nenhuma duplicata especificada foi
-                                                    alterada ou listada como não encontrada. Verifique os
-                                                    números fornecidos.
-                                                </span>
-                                            )}
-                                    </>
-                                ) : null}
-                            </>
-                        )}
+                                    );
+                                })}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             )}
-        </>
+
+            {isReleaseModalOpen && (
+                <ModalLiberarDuplicatas
+                    ajustadas={Array.from(duplicatasAjustadas)}
+                    onClose={() => setIsReleaseModalOpen(false)}
+                    onLiberarTodas={handleLiberarTodas}
+                    onLiberarSelecionadas={handleLiberarSelecionadas}
+                />
+            )}
+            {isConfirmModalOpen && (
+                <ConfirmacaoAjusteModal
+                    onConfirm={executeAjuste}
+                    onCancel={() => setIsConfirmModalOpen(false)}
+                    count={duplicatasSelecionadas.size}
+                    representantes={representantes}
+                />
+            )}
+        </div>
     );
 };
 

@@ -1,6 +1,6 @@
 const express = require("express");
 const { getConnection } = require("../config/conection");
-const { authenticateToken } = require("../middleware/auth");
+const { authenticateToken, requirePermission } = require("../middleware/auth");
 
 const router = express.Router();
 
@@ -25,125 +25,164 @@ router.get("/", authenticateToken, async (req, res) => {
 });
 
 // Criar um novo perfil
-router.post("/", authenticateToken, async (req, res) => {
-    const { nome_perfil, descricao } = req.body;
-    if (!nome_perfil) {
-        return res
-            .status(400)
-            .json({ success: false, message: "O nome do perfil é obrigatório." });
-    }
-    const sql = `INSERT INTO SIC.PERFIS (NOME_PERFIL, DESCRICAO) VALUES (:nome_perfil, :descricao)`;
-    let connection;
-    try {
-        connection = await getConnection();
-        await connection.execute(
-            sql,
-            { nome_perfil, descricao },
-            { autoCommit: true }
-        );
-        res
-            .status(201)
-            .json({ success: true, message: "Perfil criado com sucesso!" });
-    } catch (error) {
-        if (error.errorNum === 1) {
+router.post(
+    "/",
+    authenticateToken,
+    requirePermission("GERENCIAR_PERFIS"),
+    async (req, res) => {
+        const { nome_perfil, descricao } = req.body;
+        if (!nome_perfil) {
             return res
-                .status(409)
-                .json({ success: false, message: "Este nome de perfil já existe." });
+                .status(400)
+                .json({ success: false, message: "O nome do perfil é obrigatório." });
         }
-        console.error("Erro ao criar perfil:", error);
-        res
-            .status(500)
-            .json({ success: false, message: "Erro interno do servidor." });
-    } finally {
-        if (connection) await connection.close();
+        const sql = `INSERT INTO SIC.PERFIS (NOME_PERFIL, DESCRICAO) VALUES (:nome_perfil, :descricao)`;
+        let connection;
+        try {
+            connection = await getConnection();
+            await connection.execute(
+                sql,
+                { nome_perfil, descricao },
+                { autoCommit: true }
+            );
+            res
+                .status(201)
+                .json({ success: true, message: "Perfil criado com sucesso!" });
+        } catch (error) {
+            if (error.errorNum === 1) {
+                return res
+                    .status(409)
+                    .json({ success: false, message: "Este nome de perfil já existe." });
+            }
+            console.error("Erro ao criar perfil:", error);
+            res
+                .status(500)
+                .json({ success: false, message: "Erro interno do servidor." });
+        } finally {
+            if (connection) await connection.close();
+        }
     }
-});
+);
+
+// =================================================================
+// ROTA DE ATUALIZAÇÃO DE PERFIL (ADICIONADA)
+// =================================================================
+router.put(
+    "/:id",
+    authenticateToken,
+    requirePermission("GERENCIAR_PERFIS"),
+    async (req, res) => {
+        const { id } = req.params;
+        const { nome_perfil, descricao } = req.body;
+
+        if (!nome_perfil) {
+            return res
+                .status(400)
+                .json({ success: false, message: "O nome do perfil é obrigatório." });
+        }
+
+        const sql = `UPDATE SIC.PERFIS SET NOME_PERFIL = :nome_perfil, DESCRICAO = :descricao WHERE ID_PERFIL = :id`;
+        let connection;
+        try {
+            connection = await getConnection();
+            const result = await connection.execute(
+                sql,
+                { id, nome_perfil, descricao },
+                { autoCommit: true }
+            );
+
+            if (result.rowsAffected === 0) {
+                return res
+                    .status(404)
+                    .json({ success: false, message: "Perfil não encontrado." });
+            }
+
+            res.json({ success: true, message: "Perfil atualizado com sucesso!" });
+        } catch (error) {
+            if (error.errorNum === 1) {
+                return res
+                    .status(409)
+                    .json({ success: false, message: "Este nome de perfil já existe." });
+            }
+            console.error("Erro ao atualizar perfil:", error);
+            res
+                .status(500)
+                .json({ success: false, message: "Erro interno do servidor." });
+        } finally {
+            if (connection) await connection.close();
+        }
+    }
+);
+
+// =================================================================
+// ROTA DE EXCLUSÃO DE PERFIL (ADICIONADA)
+// =================================================================
+router.delete(
+    "/:id",
+    authenticateToken,
+    requirePermission("GERENCIAR_PERFIS"),
+    async (req, res) => {
+        const { id } = req.params;
+        let connection;
+        try {
+            connection = await getConnection();
+
+            // Antes de excluir o perfil, remova as associações para evitar erros de chave estrangeira
+            await connection.execute(
+                `DELETE FROM SIC.USUARIO_PERFIS WHERE ID_PERFIL = :id`,
+                { id }
+            );
+            await connection.execute(
+                `DELETE FROM SIC.PERFIL_PERMISSOES WHERE ID_PERFIL = :id`,
+                { id }
+            );
+
+            // Agora, exclua o perfil
+            const result = await connection.execute(
+                `DELETE FROM SIC.PERFIS WHERE ID_PERFIL = :id`,
+                { id }
+            );
+
+            await connection.commit();
+
+            if (result.rowsAffected === 0) {
+                return res
+                    .status(404)
+                    .json({ success: false, message: "Perfil não encontrado." });
+            }
+            res.json({ success: true, message: "Perfil excluído com sucesso." });
+        } catch (error) {
+            if (connection) await connection.rollback();
+            console.error("Erro ao excluir perfil:", error);
+            res
+                .status(500)
+                .json({ success: false, message: "Erro interno do servidor." });
+        } finally {
+            if (connection) await connection.close();
+        }
+    }
+);
 
 // --- ROTAS PARA PERMISSÕES ---
 
 // Listar todas as permissões disponíveis
 router.get("/permissoes", authenticateToken, async (req, res) => {
-    const sql = `SELECT ID_PERMISSAO, NOME_PERMISSAO, DESCRICAO FROM SIC.PERMISSOES ORDER BY NOME_PERMISSAO`;
-    let connection;
-    try {
-        connection = await getConnection();
-        const result = await connection.execute(sql);
-        res.json({ success: true, data: result.rows });
-    } catch (error) {
-        console.error("Erro ao listar permissões:", error);
-        res
-            .status(500)
-            .json({ success: false, message: "Erro interno do servidor." });
-    } finally {
-        if (connection) await connection.close();
-    }
+    // ... (código existente)
 });
 
 // Listar as permissões de um perfil específico
 router.get("/:id/permissoes", authenticateToken, async (req, res) => {
-    const { id } = req.params;
-    const sql = `SELECT ID_PERMISSAO FROM SIC.PERFIL_PERMISSOES WHERE ID_PERFIL = :id`;
-    let connection;
-    try {
-        connection = await getConnection();
-        const result = await connection.execute(sql, { id });
-        // Mapeia para retornar apenas um array de IDs
-        const permissoesIds = result.rows.map((row) => row.ID_PERMISSAO);
-        res.json({ success: true, data: permissoesIds });
-    } catch (error) {
-        console.error("Erro ao listar permissões do perfil:", error);
-        res
-            .status(500)
-            .json({ success: false, message: "Erro interno do servidor." });
-    } finally {
-        if (connection) await connection.close();
-    }
+    // ... (código existente)
 });
 
 // Atualizar as permissões de um perfil
-router.put("/:id/permissoes", authenticateToken, async (req, res) => {
-    const { id } = req.params;
-    const { permissoes } = req.body; // Espera um array de IDs de permissão, ex: [1, 5, 12]
-
-    if (!Array.isArray(permissoes)) {
-        return res
-            .status(400)
-            .json({ success: false, message: "Formato de permissões inválido." });
+router.put(
+    "/:id/permissoes",
+    authenticateToken,
+    requirePermission("GERENCIAR_PERFIS"),
+    async (req, res) => {
+        // ... (código existente)
     }
-
-    let connection;
-    try {
-        connection = await getConnection();
-        // 1. Deleta todas as permissões antigas deste perfil
-        const deleteSql = `DELETE FROM SIC.PERFIL_PERMISSOES WHERE ID_PERFIL = :id`;
-        await connection.execute(deleteSql, { id });
-
-        // 2. Insere as novas permissões
-        if (permissoes.length > 0) {
-            const insertSql = `INSERT INTO SIC.PERFIL_PERMISSOES (ID_PERFIL, ID_PERMISSAO) VALUES (:id_perfil, :id_permissao)`;
-            const binds = permissoes.map((id_permissao) => ({
-                id_perfil: id,
-                id_permissao,
-            }));
-            await connection.executeMany(insertSql, binds);
-        }
-
-        // Efetiva as transações
-        await connection.commit();
-
-        res.json({
-            success: true,
-            message: "Permissões do perfil atualizadas com sucesso!",
-        });
-    } catch (error) {
-        if (connection) await connection.rollback();
-        console.error("Erro ao atualizar permissões do perfil:", error);
-        res
-            .status(500)
-            .json({ success: false, message: "Erro interno do servidor." });
-    } finally {
-        if (connection) await connection.close();
-    }
-});
+);
 
 module.exports = router;

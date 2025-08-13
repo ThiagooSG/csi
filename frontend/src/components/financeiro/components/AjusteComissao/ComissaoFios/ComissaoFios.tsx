@@ -1,8 +1,9 @@
 import React, { useState } from "react";
 import { apiGet, apiPost } from "../../../../../utils/api";
+import { toastService } from "../../../../../services/toastService";
 import "./comissaofios.css";
 
-// --- DEFINIÇÃO DAS INTERFACES E CONSTANTES ---
+// --- Interfaces e Constantes ---
 interface Duplicata {
     num_docum: string;
     cod_empresa: string;
@@ -20,7 +21,6 @@ const REPRESENTANTE_OPTIONS = [
     { value: "221", label: "221" },
     { value: "233", label: "233" },
 ];
-
 const COMISSAO_OPTIONS = [
     { value: "", label: "Selecione..." },
     { value: "1", label: "1%" },
@@ -28,22 +28,20 @@ const COMISSAO_OPTIONS = [
     { value: "2", label: "2%" },
 ];
 
-// --- SUB-COMPONENTE: MODAL PARA LIBERAR DUPLICATAS ---
+// --- Sub-Componentes de Modal ---
 const ModalLiberarDuplicatas: React.FC<{
     ajustadas: string[];
     onClose: () => void;
     onLiberarTodas: () => void;
-    onLiberarSelecionadas: (selecionadas: Set<string>) => void;
+    onLiberarSelecionadas: (s: Set<string>) => void;
 }> = ({ ajustadas, onClose, onLiberarTodas, onLiberarSelecionadas }) => {
     const [selecionadas, setSelecionadas] = useState<Set<string>>(new Set());
-
     const handleSelect = (num_docum: string, isChecked: boolean) => {
         const novaSelecao = new Set(selecionadas);
         if (isChecked) novaSelecao.add(num_docum);
         else novaSelecao.delete(num_docum);
         setSelecionadas(novaSelecao);
     };
-
     return (
         <div className="modal-overlay">
             <div className="modal-content">
@@ -85,7 +83,57 @@ const ModalLiberarDuplicatas: React.FC<{
     );
 };
 
-// --- COMPONENTE PRINCIPAL ---
+const ConfirmacaoAjusteModal: React.FC<{
+    onConfirm: () => void;
+    onCancel: () => void;
+    count: number;
+    representante: string;
+    nomeRepresentante: string;
+    comissao: string;
+}> = ({
+    onConfirm,
+    onCancel,
+    count,
+    representante,
+    nomeRepresentante,
+    comissao,
+}) => {
+        return (
+            <div className="modal-overlay">
+                <div className="modal-content">
+                    <div className="modal-header">
+                        <h3>Confirmar Ajuste de Comissão</h3>
+                        <button onClick={onCancel} className="modal-close-btn">
+                            &times;
+                        </button>
+                    </div>
+                    <div className="confirmation-body">
+                        <p>
+                            Você tem certeza que deseja ajustar{" "}
+                            <strong>{count} duplicata(s)</strong> para:
+                        </p>
+                        <p>
+                            <strong>Representante:</strong> {representante} -{" "}
+                            {nomeRepresentante}
+                        </p>
+                        <p>
+                            <strong>Nova Comissão:</strong> {comissao}%
+                        </p>
+                    </div>
+                    <div className="modal-footer">
+                        <button className="comissao-fios-btn secondary" onClick={onCancel}>
+                            Não
+                        </button>
+                        <button className="comissao-fios-btn primary" onClick={onConfirm}>
+                            Sim, Confirmar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+// --- Componente Principal ---
 const ComissaoFios: React.FC = () => {
     const [consultaInput, setConsultaInput] = useState("");
     const [duplicatas, setDuplicatas] = useState<Duplicata[]>([]);
@@ -96,94 +144,66 @@ const ComissaoFios: React.FC = () => {
         new Set()
     );
     const [isReleaseModalOpen, setIsReleaseModalOpen] = useState(false);
+    const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
     const [loading, setLoading] = useState(false);
-    const [feedback, setFeedback] = useState<any>(null);
     const [representante, setRepresentante] = useState("");
     const [comissao, setComissao] = useState("");
     const [nomeRepresentante, setNomeRepresentante] = useState("");
 
-    /**
-     * Lógica de pesquisa com o novo travamento inteligente.
-     */
     const handlePesquisar = async () => {
-        setFeedback(null);
         setDuplicatas([]);
         setDuplicatasSelecionadas(new Set());
         const duplicatasConsulta = consultaInput
             .split(/[\n,]+/)
             .map((d) => d.trim())
             .filter(Boolean);
-        if (duplicatasConsulta.length === 0) {
-            setFeedback({
-                type: "error",
-                message: "Informe pelo menos uma duplicata para pesquisar.",
-            });
-            return;
-        }
+        if (duplicatasConsulta.length === 0) return;
+
         setLoading(true);
         try {
             const response = await apiPost("/api/comissao-fios/pesquisar", {
                 duplicatas: duplicatasConsulta,
             });
             if (response.success && response.data?.rows?.length > 0) {
+                toastService.success(
+                    `${response.data.encontradas.length} duplicata(s) encontrada(s).`
+                );
+                if (response.data.nao_encontradas.length > 0)
+                    toastService.warn(
+                        `${response.data.nao_encontradas.length} não encontrada(s).`
+                    );
                 const novasDuplicatas = response.data.rows;
                 setDuplicatas(novasDuplicatas);
-
-                // --- LÓGICA DE TRAVAMENTO INTELIGENTE ---
-                // 1. Cria um conjunto com os números das duplicatas da nova consulta.
                 const numerosDaNovaConsulta = new Set(
                     novasDuplicatas.map((d) => d.num_docum)
                 );
-                // 2. Filtra a lista de ajustadas, mantendo apenas aquelas que também existem na nova consulta.
-                setDuplicatasAjustadas((prevAjustadas) => {
-                    const novasAjustadasFiltradas = new Set<string>();
-                    for (const dup of prevAjustadas) {
-                        if (numerosDaNovaConsulta.has(dup)) {
-                            novasAjustadasFiltradas.add(dup);
-                        }
-                    }
-                    return novasAjustadasFiltradas;
-                });
-
-                setFeedback({
-                    type: "success",
-                    encontradas: response.data.encontradas,
-                    nao_encontradas: response.data.nao_encontradas,
-                });
+                setDuplicatasAjustadas(
+                    (prev) =>
+                        new Set([...prev].filter((dup) => numerosDaNovaConsulta.has(dup)))
+                );
             } else {
-                setFeedback({
-                    type: "error",
-                    message: response.data?.message || "Nenhuma duplicata encontrada.",
-                });
-                // Se a pesquisa não retornar nada, limpa a lista de ajustadas também.
+                toastService.error(
+                    response.data?.message || "Nenhuma duplicata encontrada."
+                );
                 setDuplicatasAjustadas(new Set());
             }
         } catch (err) {
-            setFeedback({
-                type: "error",
-                message: "Erro ao conectar com o servidor.",
-            });
+            toastService.error("Erro ao conectar com o servidor.");
         }
         setLoading(false);
     };
 
-    const handleAjustarComissao = async () => {
-        setFeedback(null);
+    const handleAjustarComissao = () => {
+        if (duplicatasSelecionadas.size > 0 && representante && comissao) {
+            setIsConfirmModalOpen(true);
+        } else {
+            toastService.error("Selecione duplicatas, representante e comissão.");
+        }
+    };
+
+    const executeAjuste = async () => {
+        setIsConfirmModalOpen(false);
         const duplicatasParaAjustar = Array.from(duplicatasSelecionadas);
-        if (duplicatasParaAjustar.length === 0) {
-            setFeedback({
-                type: "error",
-                message: "Selecione pelo menos uma duplicata para ajustar.",
-            });
-            return;
-        }
-        if (!representante || !comissao) {
-            setFeedback({
-                type: "error",
-                message: "Selecione um representante e a comissão.",
-            });
-            return;
-        }
         setLoading(true);
         try {
             const response = await apiPost("/api/comissao-fios/ajustar", {
@@ -192,22 +212,18 @@ const ComissaoFios: React.FC = () => {
                 comissao,
             });
             if (response.success && response.data?.alteradas) {
+                toastService.success(
+                    `${response.data.alteradas.length} duplicata(s) ajustada(s)!`
+                );
                 setDuplicatasAjustadas(
                     (prev) => new Set([...prev, ...response.data.alteradas])
                 );
                 setDuplicatasSelecionadas(new Set());
-                setFeedback({ type: "success", ...response.data });
             } else {
-                setFeedback({
-                    type: "error",
-                    message: response.data?.message || "Erro ao ajustar.",
-                });
+                toastService.error(response.data?.message || "Erro ao ajustar.");
             }
         } catch (err) {
-            setFeedback({
-                type: "error",
-                message: "Erro ao conectar com o servidor.",
-            });
+            toastService.error("Erro de conexão ao ajustar.");
         }
         setLoading(false);
     };
@@ -219,9 +235,7 @@ const ComissaoFios: React.FC = () => {
 
     const handleLiberarSelecionadas = (selecionadas: Set<string>) => {
         const novasAjustadas = new Set(duplicatasAjustadas);
-        for (const dup of selecionadas) {
-            novasAjustadas.delete(dup);
-        }
+        for (const dup of selecionadas) novasAjustadas.delete(dup);
         setDuplicatasAjustadas(novasAjustadas);
         setIsReleaseModalOpen(false);
     };
@@ -234,7 +248,6 @@ const ComissaoFios: React.FC = () => {
         setDuplicatas([]);
         setDuplicatasSelecionadas(new Set());
         setDuplicatasAjustadas(new Set());
-        setFeedback(null);
     };
 
     const handleRepresentanteChange = async (novoRepresentante: string) => {
@@ -254,30 +267,33 @@ const ComissaoFios: React.FC = () => {
         }
     };
 
-    const duplicatasParaSelecionar = duplicatas.filter(
-        (d) => !duplicatasAjustadas.has(d.num_docum)
-    );
-
-    const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.checked) {
+    const handleSelectAll = () => {
+        const duplicatasParaSelecionar = duplicatas.filter(
+            (d) => !duplicatasAjustadas.has(d.num_docum)
+        );
+        const allSelected =
+            duplicatasSelecionadas.size === duplicatasParaSelecionar.length &&
+            duplicatasParaSelecionar.length > 0;
+        if (allSelected) setDuplicatasSelecionadas(new Set());
+        else
             setDuplicatasSelecionadas(
                 new Set(duplicatasParaSelecionar.map((d) => d.num_docum))
             );
-        } else {
-            setDuplicatasSelecionadas(new Set());
-        }
     };
 
     const handleSelectRow = (num_docum: string, isChecked: boolean) => {
-        if (duplicatasAjustadas.has(num_docum)) return;
         const novaSelecao = new Set(duplicatasSelecionadas);
-        if (isChecked) {
-            novaSelecao.add(num_docum);
-        } else {
-            novaSelecao.delete(num_docum);
-        }
+        if (isChecked) novaSelecao.add(num_docum);
+        else novaSelecao.delete(num_docum);
         setDuplicatasSelecionadas(novaSelecao);
     };
+
+    const duplicatasParaSelecionar = duplicatas.filter(
+        (d) => !duplicatasAjustadas.has(d.num_docum)
+    );
+    const allSelectableChecked =
+        duplicatasParaSelecionar.length > 0 &&
+        duplicatasSelecionadas.size === duplicatasParaSelecionar.length;
 
     return (
         <div className="comissao-fios-container">
@@ -293,7 +309,7 @@ const ComissaoFios: React.FC = () => {
                         id="consulta-duplicatas-fios"
                         value={consultaInput}
                         onChange={(e) => setConsultaInput(e.target.value)}
-                        placeholder="Cole ou digite aqui as duplicatas..."
+                        placeholder="Informe os números separados por vírgula ou quebra de linha"
                         className="comissao-fios-textarea"
                         disabled={loading}
                     />
@@ -309,7 +325,9 @@ const ComissaoFios: React.FC = () => {
                 <div className="fios-painel-ajuste">
                     <div className="fios-ajuste-section">
                         <div>
-                            <label className="comissao-fios-label">Novo Representante</label>
+                            <label className="comissao-fios-label">
+                                Novo Representante
+                            </label>
                             <select
                                 className="comissao-fios-select"
                                 value={representante}
@@ -355,7 +373,7 @@ const ComissaoFios: React.FC = () => {
                             }
                             type="button"
                         >
-                            <i className="fas fa-exchange-alt"></i>
+                            <i className="fas fa-exchange-alt"></i>{" "}
                             {loading
                                 ? "Processando..."
                                 : `Ajustar (${duplicatasSelecionadas.size}) Selecionada(s)`}
@@ -397,11 +415,7 @@ const ComissaoFios: React.FC = () => {
                                         <input
                                             type="checkbox"
                                             onChange={handleSelectAll}
-                                            checked={
-                                                duplicatasParaSelecionar.length > 0 &&
-                                                duplicatasSelecionadas.size ===
-                                                duplicatasParaSelecionar.length
-                                            }
+                                            checked={allSelectableChecked}
                                             disabled={duplicatasParaSelecionar.length === 0}
                                         />
                                     </th>
@@ -443,13 +457,22 @@ const ComissaoFios: React.FC = () => {
                     </div>
                 </div>
             )}
-
             {isReleaseModalOpen && (
                 <ModalLiberarDuplicatas
                     ajustadas={Array.from(duplicatasAjustadas)}
                     onClose={() => setIsReleaseModalOpen(false)}
                     onLiberarTodas={handleLiberarTodas}
                     onLiberarSelecionadas={handleLiberarSelecionadas}
+                />
+            )}
+            {isConfirmModalOpen && (
+                <ConfirmacaoAjusteModal
+                    onConfirm={executeAjuste}
+                    onCancel={() => setIsConfirmModalOpen(false)}
+                    count={duplicatasSelecionadas.size}
+                    representante={representante}
+                    nomeRepresentante={nomeRepresentante}
+                    comissao={comissao}
                 />
             )}
         </div>

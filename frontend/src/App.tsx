@@ -5,6 +5,11 @@ import {
   Routes,
   Navigate,
 } from "react-router-dom";
+
+// 1. Importações da biblioteca de Toast
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+
 import Login from "./components/login/Login";
 import Home from "./components/home/Home";
 import Financeiro from "./components/financeiro/Financeiro";
@@ -16,6 +21,19 @@ import ResetPassword from "./components/login/ResetPassword";
 const App: React.FC = () => {
   return (
     <Router>
+      {/* ToastContainer */}
+      <ToastContainer
+        position="top-right"
+        autoClose={5000} // Fecha automaticamente após 5 segundos
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+      />
       <Routes>
         {/* Rota pública - Login */}
         <Route path="/" element={<Login />} />

@@ -1,5 +1,40 @@
 import React, { useState, useEffect } from "react";
 import { apiPost, apiPut } from "../../../utils/api";
+import { toastService } from "../../../services/toastService";
+
+// --- Sub-Componente: Modal de Confirmação ---
+const ConfirmacaoSaveModal: React.FC<{
+    onConfirm: () => void;
+    onCancel: () => void;
+    isEditing: boolean;
+}> = ({ onConfirm, onCancel, isEditing }) => {
+    return (
+        <div className="modal-overlay">
+            <div className="modal-content" style={{ maxWidth: "400px" }}>
+                <div className="modal-header">
+                    <h3>Confirmar Alterações</h3>
+                    <button onClick={onCancel} className="modal-close-btn">
+                        &times;
+                    </button>
+                </div>
+                <div className="confirmation-body">
+                    <p>
+                        Deseja realmente{" "}
+                        {isEditing ? "salvar as alterações" : "criar este novo perfil"}?
+                    </p>
+                </div>
+                <div className="modal-footer">
+                    <button className="gestao-btn secondary" onClick={onCancel}>
+                        Cancelar
+                    </button>
+                    <button className="gestao-btn" onClick={onConfirm}>
+                        Sim, Salvar
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 interface Perfil {
     ID_PERFIL?: number;
@@ -21,6 +56,7 @@ export const FormPerfil: React.FC<Props> = ({
     const [formData, setFormData] = useState({ NOME_PERFIL: "", DESCRICAO: "" });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
 
     const isEditing = !!perfilParaEditar;
 
@@ -33,11 +69,15 @@ export const FormPerfil: React.FC<Props> = ({
         }
     }, [perfilParaEditar, isEditing]);
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        setIsConfirmModalOpen(true);
+    };
+
+    const executeSave = async () => {
+        setIsConfirmModalOpen(false);
         setLoading(true);
         setError(null);
-
         const payload = {
             nome_perfil: formData.NOME_PERFIL,
             descricao: formData.DESCRICAO,
@@ -49,6 +89,9 @@ export const FormPerfil: React.FC<Props> = ({
                 : await apiPost("/api/perfis", payload);
 
             if (response.success) {
+                toastService.success(
+                    `Perfil ${isEditing ? "atualizado" : "criado"} com sucesso!`
+                );
                 onSave();
             } else {
                 setError(response.message || "Ocorreu um erro.");
@@ -107,6 +150,13 @@ export const FormPerfil: React.FC<Props> = ({
                     </div>
                 </form>
             </div>
+            {isConfirmModalOpen && (
+                <ConfirmacaoSaveModal
+                    onConfirm={executeSave}
+                    onCancel={() => setIsConfirmModalOpen(false)}
+                    isEditing={isEditing}
+                />
+            )}
         </div>
     );
 };

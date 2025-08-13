@@ -11,12 +11,14 @@ interface Props {
     perfis: Perfil[];
     onEdit: (perfil: Perfil) => void;
     onManagePermissions: (id: number) => void;
+    onDelete: (id: number) => void; // Adicionada a propriedade de exclusão
 }
 
 export const ListaPerfis: React.FC<Props> = ({
     perfis,
     onEdit,
     onManagePermissions,
+    onDelete, // Recebe a função
 }) => {
     return (
         <table className="gestao-table">
@@ -33,7 +35,6 @@ export const ListaPerfis: React.FC<Props> = ({
                         <td>{perfil.NOME_PERFIL}</td>
                         <td>{perfil.DESCRICAO}</td>
                         <td className="actions">
-                            {/* 2. Adicione a condição aqui */}
                             {hasPermission("GERENCIAR_PERFIS") && (
                                 <>
                                     <button
@@ -47,6 +48,13 @@ export const ListaPerfis: React.FC<Props> = ({
                                         onClick={() => onEdit(perfil)}
                                     >
                                         <i className="fas fa-edit"></i>
+                                    </button>
+                                    {/* Adicionado o botão de exclusão */}
+                                    <button
+                                        className="gestao-btn danger"
+                                        onClick={() => onDelete(perfil.ID_PERFIL)}
+                                    >
+                                        <i className="fas fa-trash"></i>
                                     </button>
                                 </>
                             )}

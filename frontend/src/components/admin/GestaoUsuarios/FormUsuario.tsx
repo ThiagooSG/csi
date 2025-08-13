@@ -1,13 +1,47 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { apiGet, apiPost, apiPut } from "../../../utils/api";
+import { toastService } from "../../../services/toastService";
 
-// Tipos de dados
+// --- Sub-Componente: Modal de Confirmação ---
+const ConfirmacaoSaveModal: React.FC<{
+    onConfirm: () => void;
+    onCancel: () => void;
+    isEditing: boolean;
+}> = ({ onConfirm, onCancel, isEditing }) => {
+    return (
+        <div className="modal-overlay">
+            <div className="modal-content" style={{ maxWidth: "400px" }}>
+                <div className="modal-header">
+                    <h3>Confirmar Alterações</h3>
+                    <button onClick={onCancel} className="modal-close-btn">
+                        &times;
+                    </button>
+                </div>
+                <div className="confirmation-body">
+                    <p>
+                        Deseja realmente{" "}
+                        {isEditing ? "salvar as alterações" : "criar este novo usuário"}?
+                    </p>
+                </div>
+                <div className="modal-footer">
+                    <button className="gestao-btn secondary" onClick={onCancel}>
+                        Cancelar
+                    </button>
+                    <button className="gestao-btn" onClick={onConfirm}>
+                        Sim, Salvar
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// --- Interfaces ---
 interface Perfil {
     ID_PERFIL: number;
     NOME_PERFIL: string;
 }
 
-// 1. Interface atualizada com os novos campos
 interface UsuarioFormData {
     ID_USUARIOS?: number;
     NOME_USUARIO: string;
@@ -30,7 +64,6 @@ export const FormUsuario: React.FC<Props> = ({
     onClose,
     onSave,
 }) => {
-    // 2. Estado inicial atualizado
     const [formData, setFormData] = useState<UsuarioFormData>({
         NOME_USUARIO: "",
         LOGIN_USUARIO: "",
@@ -43,6 +76,7 @@ export const FormUsuario: React.FC<Props> = ({
     const [todosPerfis, setTodosPerfis] = useState<Perfil[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
 
     const isEditing = !!usuarioParaEditar;
 
@@ -91,17 +125,19 @@ export const FormUsuario: React.FC<Props> = ({
         }));
     };
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (formData.ID_PERFIS.length === 0) {
             setError("O usuário deve ter pelo menos um perfil.");
             return;
         }
-
-        setLoading(true);
         setError(null);
+        setIsConfirmModalOpen(true);
+    };
 
-        // 3. Payload atualizado para enviar os novos dados
+    const executeSave = async () => {
+        setIsConfirmModalOpen(false);
+        setLoading(true);
         const payload = {
             nome: formData.NOME_USUARIO,
             login: formData.LOGIN_USUARIO,
@@ -121,6 +157,9 @@ export const FormUsuario: React.FC<Props> = ({
                 : await apiPost("/api/usuarios", payload);
 
             if (response.success) {
+                toastService.success(
+                    `Usuário ${isEditing ? "atualizado" : "criado"} com sucesso!`
+                );
                 onSave();
             } else {
                 setError(response.message || "Ocorreu um erro.");
@@ -152,7 +191,6 @@ export const FormUsuario: React.FC<Props> = ({
                             required
                         />
                     </div>
-                    {/* 4. Novos campos adicionados ao formulário */}
                     <div className="form-group">
                         <label>Login</label>
                         <input
@@ -194,7 +232,6 @@ export const FormUsuario: React.FC<Props> = ({
                             required={!isEditing}
                         />
                     </div>
-
                     <div className="form-group">
                         <label>Perfis</label>
                         <div className="profile-checkbox-list">
@@ -213,7 +250,6 @@ export const FormUsuario: React.FC<Props> = ({
                             ))}
                         </div>
                     </div>
-
                     <div className="form-group">
                         <label>Status</label>
                         <select
@@ -225,9 +261,7 @@ export const FormUsuario: React.FC<Props> = ({
                             <option value={0}>Inativo</option>
                         </select>
                     </div>
-
                     {error && <p className="error-message">{error}</p>}
-
                     <div className="modal-footer">
                         <button
                             type="button"
@@ -243,6 +277,13 @@ export const FormUsuario: React.FC<Props> = ({
                     </div>
                 </form>
             </div>
+            {isConfirmModalOpen && (
+                <ConfirmacaoSaveModal
+                    onConfirm={executeSave}
+                    onCancel={() => setIsConfirmModalOpen(false)}
+                    isEditing={isEditing}
+                />
+            )}
         </div>
     );
 };
