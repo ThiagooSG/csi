@@ -1,0 +1,105 @@
+/* Card Principal que engloba todo o dashboard */
+.dashboard-main-card {
+    background: white;
+    padding: 2.5rem;
+    border-radius: 1.5rem;
+    box-shadow: 0 8px 32px rgba(30, 41, 59, 0.13);
+    width: auto;
+    /* Define uma largura máxima para o card em telas grandes */
+    max-width: 1400px; 
+    margin: 0 auto; /* Centraliza o card na página */
+}
+
+.dashboard-header {
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.dashboard-header h2 {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 0;
+}
+
+.dashboard-header p {
+    font-size: 1rem;
+    color: #64748b;
+    margin-top: 0.25rem;
+}
+
+/* Grid que contém os 4 gráficos */
+.dashboard-container {
+    display: grid;
+    /* Duas colunas com a mesma largura */
+    grid-template-columns: repeat(2, 1fr);
+    gap: 2rem;
+    width: 100%;
+}
+
+/* Card individual de cada gráfico */
+.dashboard-card {
+    background-color: #f8fafc;
+    padding: 1.5rem;
+    border-radius: 1rem;
+    border: 1px solid #e2e8f0;
+    /* CORREÇÃO: Usa flexbox para o conteúdo se ajustar corretamente */
+    display: flex;
+    flex-direction: column;
+    /* Define uma altura mínima mas permite crescer se necessário */
+    min-height: 350px;
+}
+
+/* Faz o canvas do gráfico ocupar o espaço disponível dentro do card */
+.dashboard-card > canvas {
+    flex-grow: 1;
+    min-height: 0;
+    width: 100% !important;
+    height: 100% !important;
+}
+
+
+/* Estilos para o Modal de Detalhes (sem alterações) */
+.details-table-wrapper {
+    max-height: 60vh;
+    overflow-y: auto;
+    margin-top: 1rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+}
+
+.details-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.details-table th,
+.details-table td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.details-table th {
+    background-color: #f8fafc;
+    font-weight: 600;
+    position: sticky;
+    top: 0;
+}
+
+.details-table td:last-child {
+    text-align: right;
+    font-weight: 500;
+}
+
+.modal-content {
+    max-width: 800px;
+}
+
+/* REFINAMENTO DA RESPONSIVIDADE */
+@media (max-width: 1200px) {
+    .dashboard-container {
+        grid-template-columns: 1fr; /* Transforma em uma única coluna */
+    }
+}
