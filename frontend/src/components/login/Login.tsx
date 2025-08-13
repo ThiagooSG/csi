@@ -17,15 +17,18 @@ const Login: React.FC = () => {
         setLoading(true);
 
         try {
-            const data = await loginApi(login, senha);
+            // A variável 'response' agora contém o objeto ApiResponse completo
+            const response = await loginApi(login, senha);
 
-            if (data.success && data.user) {
+            if (response.success) {
                 navigate("/home");
             } else {
-                throw new Error(data.message || "Usuário ou senha inválidos.");
+                // CORREÇÃO: Usamos a propriedade 'message' ou 'error' da resposta
+                setErro(response.message || response.error || "Usuário ou senha inválidos.");
             }
         } catch (err: any) {
-            setErro(err.message || "Erro ao fazer login");
+            // Este catch agora serve para erros de rede ou exceções inesperadas
+            setErro(err.message || "Erro de conexão com o servidor.");
         } finally {
             setLoading(false);
         }
@@ -85,9 +88,7 @@ const Login: React.FC = () => {
                                     tabIndex={-1}
                                     title={showPassword ? "Ocultar senha" : "Mostrar senha"}
                                 >
-                                    <i
-                                        className={`fas fa-eye${showPassword ? "-slash" : ""}`}
-                                    ></i>
+                                    <i className={`fas fa-eye${showPassword ? "-slash" : ""}`}></i>
                                 </button>
                             </div>
                         </div>
@@ -96,7 +97,11 @@ const Login: React.FC = () => {
                             Esqueceu a senha?
                         </Link>
 
-                        <button className="login-btn" type="submit" disabled={loading}>
+                        <button
+                            className="login-btn"
+                            type="submit"
+                            disabled={loading}
+                        >
                             {loading ? <div className="spinner"></div> : "Entrar"}
                         </button>
                         {erro && <div className="erro">{erro}</div>}

@@ -8,7 +8,6 @@ import {
     Usuario,
 } from "../services/authService";
 
-// URL base da API fica centralizada aqui.
 const API_URL =
     import.meta.env.VITE_API_URL?.replace(/\/$/, "") || "http://localhost:3011";
 
@@ -27,12 +26,13 @@ export interface LoginResponse {
     message: string;
 }
 
-// --- Funções de Autenticação que fazem chamadas de rede ---
+// --- Funções de Autenticação ---
 
+// CORREÇÃO: A função agora retorna o objeto ApiResponse completo
 export async function login(
     loginStr: string,
     senha: string
-): Promise<LoginResponse> {
+): Promise<ApiResponse<LoginResponse>> {
     const response = await apiPost<LoginResponse>("/api/auth/login", {
         login: loginStr,
         senha,
@@ -42,7 +42,7 @@ export async function login(
         setAccessToken(response.data.accessToken);
         setUsuario(response.data.user);
     }
-    return response.data as LoginResponse;
+    return response; // Retorna a resposta completa
 }
 
 export async function logout(): Promise<void> {
@@ -68,8 +68,7 @@ export async function verifyToken(): Promise<boolean> {
     }
 }
 
-// --- Função de Fetch Genérica e Automatizada ---
-
+// --- Função de Fetch Genérica ---
 async function apiFetch(
     path: string,
     options: RequestInit = {}
@@ -102,7 +101,6 @@ async function apiFetch(
                     "Authorization",
                     `Bearer ${refreshResult.data.accessToken}`
                 );
-                // Tenta a requisição original novamente com o novo token
                 response = await fetch(fullUrl, {
                     ...options,
                     headers,
@@ -113,7 +111,7 @@ async function apiFetch(
             }
         } catch (error) {
             console.error("Erro no refresh do token:", error);
-            clearAuthData(); // Usa a função importada
+            clearAuthData();
             if (typeof window !== "undefined") {
                 window.location.href = "/";
             }
@@ -124,15 +122,15 @@ async function apiFetch(
     return response;
 }
 
-// --- Wrappers para os métodos HTTP (GET, POST, etc.) ---
-
+// --- Wrappers para os métodos HTTP ---
 async function handleApiResponse<T>(
     response: Response
 ): Promise<ApiResponse<T>> {
     const data = await response.json();
     return {
         success: response.ok,
-        data: response.ok ? data : undefined,
+        // CORREÇÃO: Em caso de erro, o 'data' agora contém a resposta de erro do backend
+        data: data,
         message: data.message,
         error: response.ok ? undefined : data.message || "Erro na requisição",
     };
