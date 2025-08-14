@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import { apiGet, apiPost } from "../../../../utils/api";
-import { toastService } from "../../../../services/toastService"; // 1. Importe o serviço de toast
+import { toastService } from "../../../../services/toastService";
 import "./ajusteportador.css";
 
 // --- Interfaces ---
@@ -18,7 +18,7 @@ interface Portador {
     tipo: string;
 }
 
-// --- SUB-COMPONENTE: MODAL PARA LIBERAR DUPLICATAS ---
+// --- Sub-Componentes (Modais) ---
 const ModalLiberarDuplicatas: React.FC<{
     ajustadas: string[];
     onClose: () => void;
@@ -39,34 +39,19 @@ const ModalLiberarDuplicatas: React.FC<{
             <div className="modal-content">
                 <div className="modal-header">
                     <h3>Liberar Duplicatas Ajustadas</h3>
-                    <button onClick={onClose} className="modal-close-btn">
-                        &times;
-                    </button>
+                    <button onClick={onClose} className="modal-close-btn">&times;</button>
                 </div>
                 <div className="release-list">
                     {ajustadas.map((dup) => (
                         <div key={dup} className="release-item">
-                            <input
-                                type="checkbox"
-                                id={`release-${dup}`}
-                                onChange={(e) => handleSelect(dup, e.target.checked)}
-                            />
+                            <input type="checkbox" id={`release-${dup}`} onChange={(e) => handleSelect(dup, e.target.checked)} />
                             <label htmlFor={`release-${dup}`}>{dup}</label>
                         </div>
                     ))}
                 </div>
                 <div className="modal-footer">
-                    <button
-                        className="ajuste-portador-btn secondary"
-                        onClick={onLiberarTodas}
-                    >
-                        Liberar Todas
-                    </button>
-                    <button
-                        className="ajuste-portador-btn primary"
-                        onClick={() => onLiberarSelecionadas(selecionadas)}
-                        disabled={selecionadas.size === 0}
-                    >
+                    <button className="ajuste-portador-btn secondary" onClick={onLiberarTodas}>Liberar Todas</button>
+                    <button className="ajuste-portador-btn primary" onClick={() => onLiberarSelecionadas(selecionadas)} disabled={selecionadas.size === 0}>
                         Liberar ({selecionadas.size}) Selecionadas
                     </button>
                 </div>
@@ -74,8 +59,6 @@ const ModalLiberarDuplicatas: React.FC<{
         </div>
     );
 };
-
-// --- SUB-COMPONENTE: MODAL DE CONFIRMAÇÃO DE AJUSTE ---
 const ConfirmacaoAjusteModal: React.FC<{
     onConfirm: () => void;
     onCancel: () => void;
@@ -87,29 +70,15 @@ const ConfirmacaoAjusteModal: React.FC<{
             <div className="modal-content">
                 <div className="modal-header">
                     <h3>Confirmar Ajuste</h3>
-                    <button onClick={onCancel} className="modal-close-btn">
-                        &times;
-                    </button>
+                    <button onClick={onCancel} className="modal-close-btn">&times;</button>
                 </div>
                 <div className="confirmation-body">
-                    <p>
-                        Você tem certeza que deseja ajustar{" "}
-                        <strong>{count} duplicata(s)</strong> para o portador:
-                    </p>
-                    <p>
-                        <strong>
-                            {portador?.nome} ({portador?.tipo})
-                        </strong>
-                        ?
-                    </p>
+                    <p>Você tem certeza que deseja ajustar <strong>{count} duplicata(s)</strong> para o portador:</p>
+                    <p><strong>{portador?.nome} ({portador?.tipo})</strong>?</p>
                 </div>
                 <div className="modal-footer">
-                    <button className="ajuste-portador-btn secondary" onClick={onCancel}>
-                        Não
-                    </button>
-                    <button className="ajuste-portador-btn primary" onClick={onConfirm}>
-                        Sim, Confirmar
-                    </button>
+                    <button className="ajuste-portador-btn secondary" onClick={onCancel}>Não</button>
+                    <button className="ajuste-portador-btn primary" onClick={onConfirm}>Sim, Confirmar</button>
                 </div>
             </div>
         </div>
@@ -121,55 +90,46 @@ const AjustePortador: React.FC = () => {
     const [consultaInput, setConsultaInput] = useState("");
     const [codigoPortador, setCodigoPortador] = useState("");
     const [duplicatas, setDuplicatas] = useState<Duplicata[]>([]);
-    const [portadoresEncontrados, setPortadoresEncontrados] = useState<
-        Portador[]
-    >([]);
-    const [portadorSelecionado, setPortadorSelecionado] =
-        useState<Portador | null>(null);
+    const [portadoresEncontrados, setPortadoresEncontrados] = useState<Portador[]>([]);
+    const [portadorSelecionado, setPortadorSelecionado] = useState<Portador | null>(null);
     const [loading, setLoading] = useState(false);
-    const [duplicatasSelecionadas, setDuplicatasSelecionadas] = useState<
-        Set<string>
-    >(new Set());
-    const [duplicatasAjustadas, setDuplicatasAjustadas] = useState<Set<string>>(
-        new Set()
-    );
+    const [duplicatasSelecionadas, setDuplicatasSelecionadas] = useState<Set<string>>(new Set());
+    const [duplicatasAjustadas, setDuplicatasAjustadas] = useState<Set<string>>(new Set());
     const [isReleaseModalOpen, setIsReleaseModalOpen] = useState(false);
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+
+    const atualizarTabela = useCallback(async () => {
+        const duplicatasConsulta = consultaInput.split(/[\n,]+/).map((d) => d.trim()).filter(Boolean);
+        if (duplicatasConsulta.length === 0) return;
+        try {
+            const response = await apiPost("/api/portador/pesquisar", { duplicatas: duplicatasConsulta });
+            if (response.success && response.data?.rows) {
+                setDuplicatas(response.data.rows);
+            }
+        } catch (err) {
+            console.error("Falha ao auto-atualizar a tabela:", err);
+        }
+    }, [consultaInput]);
 
     const handlePesquisar = async () => {
         setDuplicatas([]);
         setDuplicatasSelecionadas(new Set());
-        const duplicatasConsulta = consultaInput
-            .split(/[\n,]+/)
-            .map((d) => d.trim())
-            .filter(Boolean);
+        const duplicatasConsulta = consultaInput.split(/[\n,]+/).map((d) => d.trim()).filter(Boolean);
         if (duplicatasConsulta.length === 0) return;
 
         setLoading(true);
         try {
-            const response = await apiPost("/api/portador/pesquisar", {
-                duplicatas: duplicatasConsulta,
-            });
+            const response = await apiPost("/api/portador/pesquisar", { duplicatas: duplicatasConsulta });
             if (response.success && response.data?.rows) {
                 const encontradasCount = response.data.encontradas?.length || 0;
                 const naoEncontradasCount = response.data.nao_encontradas?.length || 0;
-
                 toastService.success(`${encontradasCount} duplicata(s) encontrada(s).`);
-                if (naoEncontradasCount > 0) {
-                    toastService.warn(
-                        `${naoEncontradasCount} duplicata(s) não encontrada(s).`
-                    );
-                }
+                if (naoEncontradasCount > 0) toastService.warn(`${naoEncontradasCount} duplicata(s) não encontrada(s).`);
 
                 const duplicatasEncontradas = response.data.rows;
                 setDuplicatas(duplicatasEncontradas);
-                const numerosDaNovaConsulta = new Set(
-                    duplicatasEncontradas.map((d) => d.num_docum)
-                );
-                setDuplicatasAjustadas(
-                    (prev) =>
-                        new Set([...prev].filter((dup) => numerosDaNovaConsulta.has(dup)))
-                );
+                const numerosDaNovaConsulta = new Set(duplicatasEncontradas.map(d => d.num_docum));
+                setDuplicatasAjustadas(prev => new Set([...prev].filter(dup => numerosDaNovaConsulta.has(dup))));
             } else {
                 toastService.error(response.message || "Nenhuma duplicata encontrada.");
                 setDuplicatasAjustadas(new Set());
@@ -190,17 +150,12 @@ const AjustePortador: React.FC = () => {
         }
         setLoading(true);
         try {
-            const response = await apiGet(
-                `/api/portador/obter-dados/${codigoPortador}`
-            );
+            const response = await apiGet(`/api/portador/obter-dados/${codigoPortador}`);
             if (response.success && response.data?.portadores?.length) {
                 const portadores = response.data.portadores;
                 setPortadoresEncontrados(portadores);
-                if (portadores.length === 1) {
-                    setPortadorSelecionado(portadores[0]);
-                } else {
-                    setPortadorSelecionado(null);
-                }
+                if (portadores.length === 1) setPortadorSelecionado(portadores[0]);
+                else setPortadorSelecionado(null);
             } else {
                 toastService.error(response.message || "Portador não encontrado.");
                 setPortadoresEncontrados([]);
@@ -225,12 +180,7 @@ const AjustePortador: React.FC = () => {
     const executeAjuste = async () => {
         setIsConfirmModalOpen(false);
         const duplicatasParaAjustar = Array.from(duplicatasSelecionadas);
-        if (
-            duplicatasParaAjustar.length === 0 ||
-            !codigoPortador ||
-            !portadorSelecionado
-        )
-            return;
+        if (duplicatasParaAjustar.length === 0 || !codigoPortador || !portadorSelecionado) return;
 
         setLoading(true);
         try {
@@ -239,14 +189,12 @@ const AjustePortador: React.FC = () => {
                 codigoPortador,
                 tipoPortador: portadorSelecionado.tipo,
             });
+
             if (response.success && response.data?.alteradas) {
-                toastService.success(
-                    `${response.data.alteradas.length} duplicata(s) ajustada(s) com sucesso!`
-                );
-                setDuplicatasAjustadas(
-                    (prev) => new Set([...prev, ...response.data.alteradas])
-                );
+                toastService.success(`${response.data.alteradas.length} duplicata(s) ajustada(s) com sucesso!`);
+                setDuplicatasAjustadas(prev => new Set([...prev, ...response.data.alteradas]));
                 setDuplicatasSelecionadas(new Set());
+                await atualizarTabela();
             } else {
                 toastService.error(response.message || "Falha no ajuste.");
             }
@@ -283,18 +231,12 @@ const AjustePortador: React.FC = () => {
     };
 
     const handleSelectAll = () => {
-        const duplicatasParaSelecionar = duplicatas.filter(
-            (d) => !duplicatasAjustadas.has(d.num_docum)
-        );
-        const allSelected =
-            duplicatasSelecionadas.size === duplicatasParaSelecionar.length &&
-            duplicatasParaSelecionar.length > 0;
+        const duplicatasParaSelecionar = duplicatas.filter(d => !duplicatasAjustadas.has(d.num_docum));
+        const allSelected = duplicatasSelecionadas.size === duplicatasParaSelecionar.length && duplicatasParaSelecionar.length > 0;
         if (allSelected) {
             setDuplicatasSelecionadas(new Set());
         } else {
-            setDuplicatasSelecionadas(
-                new Set(duplicatasParaSelecionar.map((d) => d.num_docum))
-            );
+            setDuplicatasSelecionadas(new Set(duplicatasParaSelecionar.map(d => d.num_docum)));
         }
     };
 
@@ -305,122 +247,47 @@ const AjustePortador: React.FC = () => {
         setDuplicatasSelecionadas(novaSelecao);
     };
 
-    const duplicatasParaSelecionar = duplicatas.filter(
-        (d) => !duplicatasAjustadas.has(d.num_docum)
-    );
-    const allSelectableChecked =
-        duplicatasParaSelecionar.length > 0 &&
-        duplicatasSelecionadas.size === duplicatasParaSelecionar.length;
+    const duplicatasParaSelecionar = duplicatas.filter(d => !duplicatasAjustadas.has(d.num_docum));
+    const allSelectableChecked = duplicatasParaSelecionar.length > 0 && duplicatasSelecionadas.size === duplicatasParaSelecionar.length;
 
     return (
         <div className="ajuste-portador-card">
             <div className="ajuste-portador-header">
-                <i
-                    className="fas fa-university"
-                    style={{ marginRight: "1rem", color: "#2563eb" }}
-                ></i>
+                <i className="fas fa-university" style={{ marginRight: '1rem', color: '#2563eb' }}></i>
                 <span className="ajuste-portador-title">Ajuste do Portador</span>
             </div>
 
             <div className="ajuste-portador-container">
                 <div className="ajuste-portador-controles-superiores">
                     <div className="ajuste-portador-painel-consulta">
-                        <label
-                            className="ajuste-portador-label"
-                            htmlFor="consulta-duplicatas"
-                        >
-                            Consultar Duplicatas
-                        </label>
-                        <textarea
-                            id="consulta-duplicatas"
-                            value={consultaInput}
-                            onChange={(e) => setConsultaInput(e.target.value)}
-                            placeholder="Informe os números separados por vírgula ou quebra de linha"
-                            className="ajuste-portador-textarea"
-                            disabled={loading}
-                        />
-                        <button
-                            className="ajuste-portador-btn primary"
-                            onClick={handlePesquisar}
-                            disabled={loading || !consultaInput.trim()}
-                        >
+                        <label className="ajuste-portador-label" htmlFor="consulta-duplicatas">Consultar Duplicatas</label>
+                        <textarea id="consulta-duplicatas" value={consultaInput} onChange={(e) => setConsultaInput(e.target.value)} placeholder="Informe os números separados por vírgula ou quebra de linha" className="ajuste-portador-textarea" disabled={loading} />
+                        <button className="ajuste-portador-btn primary" onClick={handlePesquisar} disabled={loading || !consultaInput.trim()}>
                             <i className="fas fa-search"></i> Consultar
                         </button>
                     </div>
 
                     <div className="ajuste-portador-painel-ajuste">
                         <div className="ajuste-portador-ajuste-section">
-                            <label
-                                className="ajuste-portador-label"
-                                htmlFor="codigo-portador"
-                            >
-                                Código do Novo Portador
-                            </label>
-                            <input
-                                id="codigo-portador"
-                                type="text"
-                                value={codigoPortador}
-                                onChange={(e) => setCodigoPortador(e.target.value)}
-                                onBlur={handleBuscarPortador}
-                                placeholder="Ex: 123"
-                                className="ajuste-portador-input"
-                                disabled={loading}
-                            />
+                            <label className="ajuste-portador-label" htmlFor="codigo-portador">Código do Novo Portador</label>
+                            <input id="codigo-portador" type="text" value={codigoPortador} onChange={(e) => setCodigoPortador(e.target.value)} onBlur={handleBuscarPortador} placeholder="Ex: 123" className="ajuste-portador-input" disabled={loading} />
 
-                            {portadorSelecionado && (
-                                <div className="ajuste-portador-info">
-                                    {portadorSelecionado.nome} ({portadorSelecionado.tipo})
-                                </div>
-                            )}
+                            {portadorSelecionado && <div className="ajuste-portador-info">{portadorSelecionado.nome} ({portadorSelecionado.tipo})</div>}
 
                             {portadoresEncontrados.length > 1 && (
                                 <>
-                                    <label
-                                        className="ajuste-portador-label"
-                                        htmlFor="tipo-portador"
-                                    >
-                                        Selecione o Tipo
-                                    </label>
-                                    <select
-                                        id="tipo-portador"
-                                        value={portadorSelecionado?.tipo || ""}
-                                        onChange={(e) =>
-                                            setPortadorSelecionado(
-                                                portadoresEncontrados.find(
-                                                    (p) => p.tipo === e.target.value
-                                                ) || null
-                                            )
-                                        }
-                                        className="ajuste-portador-select"
-                                        disabled={loading}
-                                    >
+                                    <label className="ajuste-portador-label" htmlFor="tipo-portador">Selecione o Tipo</label>
+                                    <select id="tipo-portador" value={portadorSelecionado?.tipo || ""} onChange={(e) => setPortadorSelecionado(portadoresEncontrados.find(p => p.tipo === e.target.value) || null)} className="ajuste-portador-select" disabled={loading}>
                                         <option value="">Selecione...</option>
-                                        {portadoresEncontrados.map((p, i) => (
-                                            <option key={`${p.tipo}-${i}`} value={p.tipo}>
-                                                {p.nome} ({p.tipo})
-                                            </option>
-                                        ))}
+                                        {portadoresEncontrados.map((p, i) => <option key={`${p.tipo}-${i}`} value={p.tipo}>{p.nome} ({p.tipo})</option>)}
                                     </select>
                                 </>
                             )}
                             <hr />
-                            <button
-                                className="ajuste-portador-btn primary full-width"
-                                onClick={handleAjustarPortador}
-                                disabled={
-                                    loading ||
-                                    duplicatasSelecionadas.size === 0 ||
-                                    !portadorSelecionado
-                                }
-                            >
-                                <i className="fas fa-exchange-alt"></i> Ajustar (
-                                {duplicatasSelecionadas.size}) Selecionada(s)
+                            <button className="ajuste-portador-btn primary full-width" onClick={handleAjustarPortador} disabled={loading || duplicatasSelecionadas.size === 0 || !portadorSelecionado}>
+                                <i className="fas fa-exchange-alt"></i> Ajustar ({duplicatasSelecionadas.size}) Selecionada(s)
                             </button>
-                            <button
-                                className="ajuste-portador-btn secondary full-width"
-                                onClick={handleLimpar}
-                                disabled={loading}
-                            >
+                            <button className="ajuste-portador-btn secondary full-width" onClick={handleLimpar} disabled={loading}>
                                 <i className="fas fa-eraser"></i> Limpar Tudo
                             </button>
                         </div>
@@ -430,16 +297,9 @@ const AjustePortador: React.FC = () => {
                 {duplicatas.length > 0 && (
                     <div className="ajuste-portador-table-card">
                         <div className="ajuste-portador-table-header">
-                            <h3>
-                                Duplicatas Encontradas ({duplicatas.length}) | Selecionadas (
-                                {duplicatasSelecionadas.size}) | Ajustadas (
-                                {duplicatasAjustadas.size})
-                            </h3>
+                            <h3>Duplicatas Encontradas ({duplicatas.length}) | Selecionadas ({duplicatasSelecionadas.size}) | Ajustadas ({duplicatasAjustadas.size})</h3>
                             {duplicatasAjustadas.size > 0 && (
-                                <button
-                                    className="ajuste-portador-btn tertiary"
-                                    onClick={() => setIsReleaseModalOpen(true)}
-                                >
+                                <button className="ajuste-portador-btn tertiary" onClick={() => setIsReleaseModalOpen(true)}>
                                     <i className="fas fa-unlock"></i> Liberar Duplicatas
                                 </button>
                             )}
@@ -448,14 +308,7 @@ const AjustePortador: React.FC = () => {
                             <table className="ajuste-portador-table">
                                 <thead>
                                     <tr>
-                                        <th>
-                                            <input
-                                                type="checkbox"
-                                                onChange={handleSelectAll}
-                                                checked={allSelectableChecked}
-                                                disabled={duplicatasParaSelecionar.length === 0}
-                                            />
-                                        </th>
+                                        <th><input type="checkbox" onChange={handleSelectAll} checked={allSelectableChecked} disabled={duplicatasParaSelecionar.length === 0} /></th>
                                         <th>Nº Duplicata</th>
                                         <th>Empresa</th>
                                         <th>Cliente</th>
@@ -467,20 +320,8 @@ const AjustePortador: React.FC = () => {
                                     {duplicatas.map((d, index) => {
                                         const isAdjusted = duplicatasAjustadas.has(d.num_docum);
                                         return (
-                                            <tr
-                                                key={`${d.num_docum}-${index}`}
-                                                className={isAdjusted ? "adjusted" : ""}
-                                            >
-                                                <td>
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={duplicatasSelecionadas.has(d.num_docum)}
-                                                        onChange={(e) =>
-                                                            handleSelectRow(d.num_docum, e.target.checked)
-                                                        }
-                                                        disabled={isAdjusted}
-                                                    />
-                                                </td>
+                                            <tr key={`${d.num_docum}-${index}`} className={isAdjusted ? 'adjusted' : ''}>
+                                                <td><input type="checkbox" checked={duplicatasSelecionadas.has(d.num_docum)} onChange={(e) => handleSelectRow(d.num_docum, e.target.checked)} disabled={isAdjusted} /></td>
                                                 <td>{d.num_docum}</td>
                                                 <td>{d.cod_empresa}</td>
                                                 <td title={d.nome_cliente}>{d.nome_cliente}</td>
@@ -496,23 +337,8 @@ const AjustePortador: React.FC = () => {
                 )}
             </div>
 
-            {isReleaseModalOpen && (
-                <ModalLiberarDuplicatas
-                    ajustadas={Array.from(duplicatasAjustadas)}
-                    onClose={() => setIsReleaseModalOpen(false)}
-                    onLiberarTodas={handleLiberarTodas}
-                    onLiberarSelecionadas={handleLiberarSelecionadas}
-                />
-            )}
-
-            {isConfirmModalOpen && (
-                <ConfirmacaoAjusteModal
-                    onConfirm={executeAjuste}
-                    onCancel={() => setIsConfirmModalOpen(false)}
-                    count={duplicatasSelecionadas.size}
-                    portador={portadorSelecionado}
-                />
-            )}
+            {isReleaseModalOpen && <ModalLiberarDuplicatas ajustadas={Array.from(duplicatasAjustadas)} onClose={() => setIsReleaseModalOpen(false)} onLiberarTodas={handleLiberarTodas} onLiberarSelecionadas={handleLiberarSelecionadas} />}
+            {isConfirmModalOpen && <ConfirmacaoAjusteModal onConfirm={executeAjuste} onCancel={() => setIsConfirmModalOpen(false)} count={duplicatasSelecionadas.size} portador={portadorSelecionado} />}
         </div>
     );
 };

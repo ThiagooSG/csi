@@ -41,14 +41,6 @@ router.post("/pesquisar", authenticateToken, async (req, res) => {
         });
         const result = await connection.execute(sql, binds);
 
-        if (result.rows.length === 0) {
-            return res.json({
-                success: false,
-                message: "Nenhuma duplicata encontrada.",
-            });
-        }
-
-        // Sempre trime os resultados do banco
         const rows = result.rows.map((row) => ({
             cod_empresa: row.COD_EMPRESA,
             num_docum: String(row.NUM_DOCUM).trim(),
@@ -58,20 +50,11 @@ router.post("/pesquisar", authenticateToken, async (req, res) => {
             tipo_portador: row.TIPO_PORTADOR,
         }));
 
-        // Trime tudo para comparação
         const encontradas = rows.map((r) => r.num_docum.trim());
         const encontradasSet = new Set(encontradas);
         const nao_encontradas = duplicatasLimpas.filter(
             (d) => !encontradasSet.has(d.trim())
         );
-
-        // Log para debug
-        console.log({
-            endpoint: "/pesquisar",
-            duplicatasLimpas,
-            encontradas,
-            nao_encontradas,
-        });
 
         res.json({ success: true, rows, encontradas, nao_encontradas });
     } catch (error) {
@@ -115,77 +98,57 @@ router.get("/obter-dados/:codigo", authenticateToken, async (req, res) => {
     }
 });
 
-// Rota para ajustar o portador
+// Rota para ajustar o portador (ATUALIZADA)
 router.post("/ajustar", authenticateToken, async (req, res) => {
-    const { duplicatas, codigoPortador } = req.body;
+    // Agora recebe também o 'tipoPortador'
+    const { duplicatas, codigoPortador, tipoPortador } = req.body;
     const duplicatasLimpas = (duplicatas || [])
         .map((d) => d.trim())
         .filter((d) => d);
 
-    if (duplicatasLimpas.length === 0 || !codigoPortador) {
+    if (duplicatasLimpas.length === 0 || !codigoPortador || !tipoPortador) {
         return res
             .status(400)
             .json({ success: false, message: "Dados insuficientes para o ajuste." });
     }
 
     const placeholders = duplicatasLimpas.map((_, i) => `:dup${i}`).join(", ");
-    const selectSql = `
-        SELECT TRIM(NUM_DOCUM) AS NUM_DOCUM
-        FROM logix.DOCUM
-        WHERE TRIM(NUM_DOCUM) IN (${placeholders})
-    `;
+
+    // Query de UPDATE agora atualiza COD_PORTADOR e IES_TIP_PORTADOR
     const updateSql = `
         UPDATE logix.DOCUM
-        SET COD_PORTADOR = :codigoPortador
+        SET COD_PORTADOR = :codigoPortador,
+            IES_TIP_PORTADOR = :tipoPortador 
         WHERE TRIM(NUM_DOCUM) IN (${placeholders})
     `;
 
     let connection;
     try {
         connection = await getConnection();
-
-        // Binds separados!
-        const bindsSelect = {};
-        duplicatasLimpas.forEach((dup, i) => {
-            bindsSelect[`dup${i}`] = dup;
-        });
-
-        const bindsUpdate = { codigoPortador };
+        const bindsUpdate = { codigoPortador, tipoPortador };
         duplicatasLimpas.forEach((dup, i) => {
             bindsUpdate[`dup${i}`] = dup;
         });
 
-        // Busca as duplicatas que realmente existem (sempre trime)
+        const updateResult = await connection.execute(updateSql, bindsUpdate, {
+            autoCommit: true,
+        });
+
+        const rowsAffected = updateResult.rowsAffected || 0;
+
+        const selectSql = `SELECT TRIM(NUM_DOCUM) AS NUM_DOCUM FROM logix.DOCUM WHERE TRIM(NUM_DOCUM) IN (${placeholders})`;
+        const bindsSelect = {};
+        duplicatasLimpas.forEach((dup, i) => {
+            bindsSelect[`dup${i}`] = dup;
+        });
         const selectResult = await connection.execute(selectSql, bindsSelect);
         const existentes = (selectResult.rows || []).map((r) =>
             String(r.NUM_DOCUM).trim()
         );
-
         const existentesSet = new Set(existentes);
         const nao_encontradas = duplicatasLimpas.filter(
             (d) => !existentesSet.has(d.trim())
         );
-
-        let alteradas = [];
-        let rowsAffected = 0;
-
-        if (existentes.length > 0) {
-            // Atualiza apenas as existentes
-            const updateResult = await connection.execute(updateSql, bindsUpdate, {
-                autoCommit: true,
-            });
-            rowsAffected = updateResult.rowsAffected || 0;
-            alteradas = existentes;
-        }
-
-        // Log para debug
-        console.log({
-            endpoint: "/ajustar",
-            duplicatasLimpas,
-            alteradas,
-            nao_encontradas,
-            rowsAffected,
-        });
 
         if (rowsAffected === 0) {
             return res.json({
@@ -199,7 +162,7 @@ router.post("/ajustar", authenticateToken, async (req, res) => {
         res.json({
             success: true,
             message: `${rowsAffected} duplicata(s) atualizada(s) com sucesso!`,
-            alteradas,
+            alteradas: duplicatasLimpas.filter((d) => existentesSet.has(d.trim())),
             nao_encontradas,
         });
     } catch (error) {
