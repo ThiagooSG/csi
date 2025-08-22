@@ -20,9 +20,9 @@ app.use(cookieParser());
 app.use(
   cors({
     origin: [
-      "http://localhost:5179",
-      "http://127.0.0.1:5179",
-      "http://10.10.2.141:5179",
+      "http://localhost:5174",
+      "http://127.0.0.1:5174",
+      "http://10.10.2.141:5174",
     ],
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
@@ -63,7 +63,7 @@ app.use((req, res) => {
 });
 
 // 5. Inicialização do servidor
-const PORT = process.env.PORT || 3020;
+const PORT = process.env.PORT || 3011;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Servidor rodando em http://localhost:${PORT}`);
 });
