@@ -18,6 +18,11 @@ const menuItems = [
         icon: "fa-dollar-sign",
         requiredPermission: null,
     },
+    {   label: "PCP", 
+        path: "/pcp", 
+        icon: "fa-industry", 
+        requiredPermission: null 
+    },
     {
         label: "Gestão de Acessos",
         path: "/admin",

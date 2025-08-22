@@ -1,6 +1,4 @@
-/* =================================================================== */
-/* ARQUIVO: comissaofios.css (VERSÃO COM PAINÉIS LADO A LADO NO TOPO)   */
-/* =================================================================== */
+/* ===== existente (mantido) ===== */
 .comissao-fios-container { width: 100%; display: flex; flex-direction: column; gap: 2rem; }
 .fios-controles-superiores { display: flex; gap: 2rem; align-items: flex-start; }
 .fios-painel-consulta { flex: 3; display: flex; flex-direction: column; gap: 1rem; }
@@ -10,12 +8,14 @@
 .comissao-fios-textarea, .comissao-fios-select { width: 100%; padding: 0.75rem; font-size: 1rem; border: 1px solid #e2e8f0; border-radius: 0.5rem; box-sizing: border-box; }
 .comissao-fios-textarea { min-height: 220px; resize: vertical; }
 .comissao-fios-representante-nome { margin-top: 0.5rem; font-size: 0.9rem; color: #475569; }
+
 .comissao-fios-btn { padding: 0.7rem 1.5rem; border: none; border-radius: 0.5rem; color: white; cursor: pointer; font-size: 1rem; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; transition: background-color 0.2s; }
 .comissao-fios-btn.primary { background-color: #2563eb; }
 .comissao-fios-btn.secondary { background-color: #64748b; }
 .comissao-fios-btn.tertiary { background-color: #f59e0b; }
 .comissao-fios-btn.full-width { width: 100%; }
 .comissao-fios-btn:disabled { background-color: #cbd5e1; cursor: not-allowed; }
+
 .comissao-fios-table-card { border: 1px solid #e2e8f0; border-radius: 1rem; overflow: hidden; }
 .comissao-fios-table-header { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.5rem; background-color: #f8fafc; border-bottom: 1px solid #e2e8f0; }
 .comissao-fios-table-header h3 { margin: 0; font-size: 1.1rem; }
@@ -28,10 +28,11 @@
 .comissao-fios-table tr.adjusted { background-color: #e2e8f0; color: #94a3b8; }
 .comissao-fios-table tr.adjusted:hover { background-color: #e2e8f0; }
 .comissao-fios-table tr.adjusted td { color: #94a3b8; }
+
 @media (max-width: 900px) { .fios-controles-superiores { flex-direction: column; } .comissao-fios-textarea { min-height: 150px; } }
 
-/* Estilos para o Modal de Liberação */
-.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0, 0, 0, 0.6); display: flex; justify-content: center; align-items: center; z-index: 1000; }
+/* Modal liberação */
+.modal-overlay { position: fixed; inset: 0; background-color: rgba(0,0,0,.6); display: flex; justify-content: center; align-items: center; z-index: 1000; }
 .modal-content { background-color: #fff; padding: 2rem; border-radius: 1rem; width: 100%; max-width: 500px; }
 .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
 .modal-header h3 { margin: 0; font-size: 1.5rem; }
@@ -40,3 +41,44 @@
 .release-item { display: flex; align-items: center; padding: 0.5rem; }
 .release-item input { margin-right: 0.75rem; }
 .modal-footer { display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1.5rem; }
+
+/* ===================== ADIÇÕES ===================== */
+/* Modal XL e tabela da simulação */
+.modal-content.modal-xl { width: min(1280px, 96vw); max-width: 1280px; }
+.sim-table th, .sim-table td { white-space: nowrap; }
+.modal-content .comissao-fios-table-wrapper { overflow-x: auto; }
+
+/* Tokens de animação */
+:root {
+  --fios-ease-out: cubic-bezier(.2,.8,.2,1);
+  --fios-shadow-hover: 0 10px 28px rgba(30,41,59,.12);
+  --fios-shadow-press: 0 6px 18px rgba(30,41,59,.18);
+  --fios-press-scale: .985;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .comissao-fios-btn {
+    position: relative;
+    overflow: hidden;
+    transition:
+      transform .12s var(--fios-ease-out),
+      box-shadow .20s var(--fios-ease-out),
+      background-color .15s var(--fios-ease-out),
+      color .15s var(--fios-ease-out);
+    will-change: transform, box-shadow;
+  }
+  .comissao-fios-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: var(--fios-shadow-hover); }
+  .comissao-fios-btn:active:not(:disabled) { transform: translateY(0) scale(var(--fios-press-scale)); box-shadow: var(--fios-shadow-press); }
+  .comissao-fios-btn::after {
+    content: ""; position: absolute; left: 50%; top: 50%;
+    width: 0; height: 0; border-radius: 50%; background: rgba(255,255,255,.35);
+    transform: translate(-50%,-50%); opacity: 0;
+    transition: width .35s var(--fios-ease-out), height .35s var(--fios-ease-out), opacity .40s var(--fios-ease-out);
+    pointer-events: none;
+  }
+  .comissao-fios-btn:active::after { width: 220%; height: 220%; opacity: .35; transition: 0s; }
+}
+.comissao-fios-btn:focus-visible,
+.comissao-fios-textarea:focus-visible,
+.comissao-fios-select:focus-visible {
+  outline: 3px solid #93c5fd; outline-offset: 2px; box-shadow: 0 0 0 3px rgba(147,197,253,.35);
+}

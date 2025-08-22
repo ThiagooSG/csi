@@ -9,7 +9,7 @@ import {
 } from "../services/authService";
 
 const API_URL =
-    import.meta.env.VITE_API_URL?.replace(/\/$/, "") || "http://localhost:3011";
+    import.meta.env.VITE_API_URL?.replace(/\/$/, "") || "http://localhost:3020";
 
 // --- Interfaces de Resposta ---
 export interface ApiResponse<T = any> {

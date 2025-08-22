@@ -4,12 +4,93 @@ const { authenticateToken } = require("../middleware/auth");
 
 const router = express.Router();
 
-// Rota para pesquisar duplicatas
+/**
+ * ==========================
+ *  Travas com TTL (memória)
+ * ==========================
+ * locks: Map<keyDoc, expiresAtMs>
+ * userAdjusted: Map<userKey, Set<keyDoc>>
+ * keyDoc = "COD_EMPRESA|IES_TIP_DOCUM|NUM_DOCUM"
+ */
+let LOCK_TTL_SECONDS = Number(process.env.LOCK_TTL_SECONDS || 1800);
+// 30 min padrão
+const locks = new Map();
+const userAdjusted = new Map();
+
+function getUserKey(req) {
+    const u = req.user || {};
+    return u.id || u.sub || u.email || u.username || "default";
+}
+function makeKey(codEmpresa, tipDocum, numDocum) {
+    return `${String(codEmpresa).trim()}|${String(tipDocum).trim()}|${String(
+        numDocum
+    ).trim()}`;
+}
+function parseKey(key) {
+    const [COD_EMPRESA, IES_TIP_DOCUM, NUM_DOCUM] = key.split("|");
+    return { COD_EMPRESA, IES_TIP_DOCUM, NUM_DOCUM };
+}
+function isUniqueViolation(err) {
+    return err && (err.errorNum === 1 || err.code === "ORA-00001");
+}
+function isLocked(key) {
+    const exp = locks.get(key);
+    if (!exp) return false;
+    const now = Date.now();
+    if (exp <= now) {
+        locks.delete(key);
+        // higieniza coleções por usuário
+        for (const [uk, set] of userAdjusted) {
+            if (set.has(key)) {
+                set.delete(key);
+                userAdjusted.set(uk, set);
+            }
+        }
+        return false;
+    }
+    return true;
+}
+function lockKey(key, userKey) {
+    const exp = Date.now() + LOCK_TTL_SECONDS * 1000;
+    locks.set(key, exp);
+    const set = userAdjusted.get(userKey) || new Set();
+    set.add(key);
+    userAdjusted.set(userKey, set);
+}
+function unlockKeys(keys, userKey) {
+    const set = userAdjusted.get(userKey) || new Set();
+    for (const k of keys) {
+        locks.delete(k);
+        set.delete(k);
+    }
+    userAdjusted.set(userKey, set);
+}
+// limpeza periódica
+setInterval(() => {
+    const now = Date.now();
+    for (const [k, exp] of locks) if (exp <= now) locks.delete(k);
+    for (const [uk, set] of userAdjusted) {
+        for (const k of Array.from(set)) if (!locks.has(k)) set.delete(k);
+        userAdjusted.set(uk, set);
+    }
+}, 60_000);
+
+/**
+ * GET /api/portador/ping
+ */
+router.get("/ping", (req, res) => {
+    res.json({ ok: true, msg: "portadorRoute ativo" });
+});
+
+/**
+ * POST /api/portador/pesquisar
+ * body: { duplicatas: ["021244-004/25", ...] }
+ */
 router.post("/pesquisar", authenticateToken, async (req, res) => {
     const { duplicatas } = req.body;
     const duplicatasLimpas = (duplicatas || [])
         .map((d) => d.trim())
-        .filter((d) => d);
+        .filter(Boolean);
 
     if (duplicatasLimpas.length === 0) {
         return res
@@ -19,31 +100,31 @@ router.post("/pesquisar", authenticateToken, async (req, res) => {
 
     const placeholders = duplicatasLimpas.map((_, i) => `:dup${i}`).join(", ");
     const sql = `
-        SELECT 
-            d.COD_EMPRESA, 
-            d.NUM_DOCUM,
-            c.NOME_CLIENTE,
-            d.COD_PORTADOR,
-            p.NOM_PORTADOR AS NOME_PORTADOR,
-            p.IES_TIP_PORTADOR AS TIPO_PORTADOR
-        FROM logix.DOCUM d
-        LEFT JOIN logix.PORTADOR p ON p.COD_PORTADOR = d.COD_PORTADOR
-        LEFT JOIN COMERCIAL.CLIENTE c ON d.COD_CLIENTE = c.CLIENTE
-        WHERE TRIM(d.NUM_DOCUM) IN (${placeholders})
-    `;
+    SELECT 
+      d.COD_EMPRESA, 
+      d.NUM_DOCUM,
+      c.NOME_CLIENTE,
+      d.COD_PORTADOR,
+      p.NOM_PORTADOR AS NOME_PORTADOR,
+      p.IES_TIP_PORTADOR AS TIPO_PORTADOR
+    FROM LOGIX.DOCUM d
+    LEFT JOIN LOGIX.PORTADOR p ON p.COD_PORTADOR = d.COD_PORTADOR
+    LEFT JOIN COMERCIAL.CLIENTE c ON d.COD_CLIENTE = c.CLIENTE
+    WHERE TRIM(d.NUM_DOCUM) IN (${placeholders})
+  `;
 
     let connection;
     try {
         connection = await getConnection();
+
         const binds = {};
-        duplicatasLimpas.forEach((dup, i) => {
-            binds[`dup${i}`] = dup;
-        });
+        duplicatasLimpas.forEach((dup, i) => (binds[`dup${i}`] = dup));
+
         const result = await connection.execute(sql, binds);
 
         const rows = result.rows.map((row) => ({
             cod_empresa: row.COD_EMPRESA,
-            num_docum: String(row.NUM_DOCUM).trim(),
+            num_docum: String(row.NUM_DOCUM || "").trim(),
             nome_cliente: row.NOME_CLIENTE,
             cod_portador: row.COD_PORTADOR,
             nome_portador: row.NOME_PORTADOR,
@@ -67,10 +148,16 @@ router.post("/pesquisar", authenticateToken, async (req, res) => {
     }
 });
 
-// Rota para obter dados do portador
+/**
+ * GET /api/portador/obter-dados/:codigo
+ */
 router.get("/obter-dados/:codigo", authenticateToken, async (req, res) => {
     const { codigo } = req.params;
-    const sql = `SELECT NOM_PORTADOR, IES_TIP_PORTADOR FROM logix.PORTADOR WHERE COD_PORTADOR = :codigo`;
+    const sql = `
+    SELECT NOM_PORTADOR, IES_TIP_PORTADOR
+    FROM LOGIX.PORTADOR
+    WHERE COD_PORTADOR = :codigo
+  `;
 
     let connection;
     try {
@@ -98,13 +185,86 @@ router.get("/obter-dados/:codigo", authenticateToken, async (req, res) => {
     }
 });
 
-// Rota para ajustar o portador (ATUALIZADA)
+/**
+ * GET /api/portador/ajustadas
+ */
+router.get("/ajustadas", authenticateToken, async (req, res) => {
+    const userKey = getUserKey(req);
+    const set = userAdjusted.get(userKey) || new Set();
+    const lista = Array.from(set)
+        .filter((k) => isLocked(k))
+        .map(parseKey);
+    return res.json({ success: true, duplicatas: lista });
+});
+
+/**
+ * GET /api/portador/ttl  -> { ttl_seconds }
+ * POST /api/portador/ttl -> { seconds, applyToExisting? }
+ */
+router.get("/ttl", authenticateToken, async (req, res) => {
+    return res.json({ success: true, ttl_seconds: LOCK_TTL_SECONDS });
+});
+
+router.post("/ttl", authenticateToken, async (req, res) => {
+    const { seconds, applyToExisting = false } = req.body || {};
+    const s = Number(seconds);
+    if (!Number.isFinite(s) || s < 60 || s > 86400) {
+        return res.status(400).json({ success: false, message: "TTL inválido (60–86400 segundos)." });
+    }
+    LOCK_TTL_SECONDS = s;
+
+    if (applyToExisting) {
+        const now = Date.now();
+        for (const k of Array.from(locks.keys())) {
+            locks.set(k, now + LOCK_TTL_SECONDS * 1000);
+        }
+    }
+    return res.json({ success: true, ttl_seconds: LOCK_TTL_SECONDS, appliedToExisting: !!applyToExisting });
+});
+
+/**
+ * POST /api/portador/liberar
+ * body: { duplicatas?: [{cod_empresa, ies_tip_docum, num_docum}], todas?: boolean }
+ */
+router.post("/liberar", authenticateToken, async (req, res) => {
+    const { duplicatas = [], todas = false } = req.body || {};
+    const userKey = getUserKey(req);
+    const set = userAdjusted.get(userKey) || new Set();
+
+    if (todas) {
+        unlockKeys(Array.from(set), userKey);
+        return res.json({
+            success: true,
+            message: "Todas as duplicatas foram liberadas.",
+        });
+    }
+
+    const wanted = new Set(
+        (duplicatas || []).map((d) =>
+            makeKey(d.cod_empresa, d.ies_tip_docum, d.num_docum)
+        )
+    );
+
+    const liberadas = [];
+    for (const key of Array.from(set)) {
+        if (wanted.has(key)) liberadas.push(key);
+    }
+    unlockKeys(liberadas, userKey);
+    return res.json({
+        success: true,
+        message: `Liberadas ${liberadas.length} duplicata(s).`,
+    });
+});
+
+/**
+ * POST /api/portador/ajustar
+ * body: { duplicatas: [...], codigoPortador: "xxxx", tipoPortador: "A|B|C|...", dryRun?: boolean }
+ */
 router.post("/ajustar", authenticateToken, async (req, res) => {
-    // Agora recebe também o 'tipoPortador'
-    const { duplicatas, codigoPortador, tipoPortador } = req.body;
+    const { duplicatas, codigoPortador, tipoPortador, dryRun = false } = req.body;
     const duplicatasLimpas = (duplicatas || [])
         .map((d) => d.trim())
-        .filter((d) => d);
+        .filter(Boolean);
 
     if (duplicatasLimpas.length === 0 || !codigoPortador || !tipoPortador) {
         return res
@@ -112,62 +272,323 @@ router.post("/ajustar", authenticateToken, async (req, res) => {
             .json({ success: false, message: "Dados insuficientes para o ajuste." });
     }
 
-    const placeholders = duplicatasLimpas.map((_, i) => `:dup${i}`).join(", ");
-
-    // Query de UPDATE agora atualiza COD_PORTADOR e IES_TIP_PORTADOR
-    const updateSql = `
-        UPDATE logix.DOCUM
-        SET COD_PORTADOR = :codigoPortador,
-            IES_TIP_PORTADOR = :tipoPortador 
-        WHERE TRIM(NUM_DOCUM) IN (${placeholders})
-    `;
-
     let connection;
     try {
         connection = await getConnection();
-        const bindsUpdate = { codigoPortador, tipoPortador };
-        duplicatasLimpas.forEach((dup, i) => {
-            bindsUpdate[`dup${i}`] = dup;
-        });
 
-        const updateResult = await connection.execute(updateSql, bindsUpdate, {
-            autoCommit: true,
-        });
+        const alteradas = [];
+        const preview = [];
+        const nao_encontradas = [];
+        const com_erro = [];
 
-        const rowsAffected = updateResult.rowsAffected || 0;
+        for (const num_docum of duplicatasLimpas) {
+            try {
+                // inicia transação
+                await connection.execute("BEGIN NULL; END;");
 
-        const selectSql = `SELECT TRIM(NUM_DOCUM) AS NUM_DOCUM FROM logix.DOCUM WHERE TRIM(NUM_DOCUM) IN (${placeholders})`;
-        const bindsSelect = {};
-        duplicatasLimpas.forEach((dup, i) => {
-            bindsSelect[`dup${i}`] = dup;
-        });
-        const selectResult = await connection.execute(selectSql, bindsSelect);
-        const existentes = (selectResult.rows || []).map((r) =>
-            String(r.NUM_DOCUM).trim()
-        );
-        const existentesSet = new Set(existentes);
-        const nao_encontradas = duplicatasLimpas.filter(
-            (d) => !existentesSet.has(d.trim())
-        );
+                // 1) DOCUM — base + portador original
+                const rDocum = await connection.execute(
+                    `
+          SELECT 
+            COD_EMPRESA, 
+            IES_TIP_DOCUM, 
+            VAL_SALDO,
+            COD_PORTADOR       AS COD_PORTADOR_ORIG,
+            IES_TIP_PORTADOR   AS IES_TIP_PORT_ORIG
+          FROM LOGIX.DOCUM
+          WHERE TRIM(NUM_DOCUM) = :NUM_DOCUM
+        `,
+                    { NUM_DOCUM: num_docum }
+                );
+                if (rDocum.rows.length === 0) {
+                    nao_encontradas.push(num_docum);
+                    await connection.rollback();
+                    continue;
+                }
+                const {
+                    COD_EMPRESA,
+                    IES_TIP_DOCUM,
+                    VAL_SALDO: VAL_SALDO_DOCUM,
+                    COD_PORTADOR_ORIG,
+                    IES_TIP_PORT_ORIG,
+                } = rDocum.rows[0];
 
-        if (rowsAffected === 0) {
-            return res.json({
-                success: false,
-                message: "Nenhuma duplicata foi encontrada para atualização.",
-                alteradas: [],
-                nao_encontradas,
-            });
+                const docKey = makeKey(COD_EMPRESA, IES_TIP_DOCUM, num_docum);
+
+                // trava existente?
+                if (isLocked(docKey)) {
+                    await connection.rollback();
+                    return res.status(423).json({
+                        success: false,
+                        status: 423,
+                        message: `Duplicata ${num_docum} está travada para novo ajuste. Use "Liberar Duplicata".`,
+                        duplicata: { COD_EMPRESA, IES_TIP_DOCUM, NUM_DOCUM: num_docum },
+                    });
+                }
+
+                // lock na linha
+                await connection.execute(
+                    `
+          SELECT 1
+          FROM LOGIX.DOCUM
+          WHERE COD_EMPRESA = :COD_EMPRESA
+            AND TRIM(NUM_DOCUM) = :NUM_DOCUM
+            AND IES_TIP_DOCUM = :IES_TIP_DOCUM
+          FOR UPDATE
+        `,
+                    { COD_EMPRESA, NUM_DOCUM: num_docum, IES_TIP_DOCUM }
+                );
+
+                // 2) DOCUM_BANCO (opcional)
+                const rBanco = await connection.execute(
+                    `
+          SELECT 1
+          FROM LOGIX.DOCUM_BANCO
+          WHERE COD_EMPRESA   = :COD_EMPRESA
+            AND NUM_DOCUM     = :NUM_DOCUM
+            AND IES_TIP_DOCUM = :IES_TIP_DOCUM
+            AND COD_PORTADOR  = :COD_PORTADOR
+            AND ROWNUM = 1
+        `,
+                    {
+                        COD_EMPRESA,
+                        NUM_DOCUM: num_docum,
+                        IES_TIP_DOCUM,
+                        COD_PORTADOR: codigoPortador,
+                    }
+                );
+                const temBanco = rBanco.rows.length > 0;
+
+                // 3) heranças para DOCUM_PORT
+                let iesTipCobr = tipoPortador;
+                let codAgencia = null;
+                let digAgencia = null;
+
+                const rLastPortInfo = await connection.execute(
+                    `
+          SELECT IES_TIP_COBR, COD_AGENCIA, DIG_AGENCIA
+          FROM (
+            SELECT IES_TIP_COBR, COD_AGENCIA, DIG_AGENCIA
+            FROM LOGIX.DOCUM_PORT
+            WHERE COD_EMPRESA   = :COD_EMPRESA
+              AND TRIM(NUM_DOCUM) = :NUM_DOCUM
+              AND IES_TIP_DOCUM = :IES_TIP_DOCUM
+            ORDER BY NUM_SEQ_DOCUM DESC
+          ) WHERE ROWNUM = 1
+        `,
+                    { COD_EMPRESA, NUM_DOCUM: num_docum, IES_TIP_DOCUM }
+                );
+                if (rLastPortInfo.rows.length > 0) {
+                    iesTipCobr = rLastPortInfo.rows[0].IES_TIP_COBR || iesTipCobr;
+                    codAgencia = rLastPortInfo.rows[0].COD_AGENCIA ?? null;
+                    digAgencia = rLastPortInfo.rows[0].DIG_AGENCIA ?? null;
+                }
+
+                // --- último e próximo seqs (com TRIM) ---
+                const rLastPort = await connection.execute(
+                    `
+          SELECT NVL(MAX(NUM_SEQ_DOCUM), 0) AS LAST_SEQ
+          FROM LOGIX.DOCUM_PORT
+          WHERE COD_EMPRESA   = :COD_EMPRESA
+            AND TRIM(NUM_DOCUM) = :NUM_DOCUM
+            AND IES_TIP_DOCUM = :IES_TIP_DOCUM
+        `,
+                    { COD_EMPRESA, NUM_DOCUM: num_docum, IES_TIP_DOCUM }
+                );
+                const lastPortSeq = Number(rLastPort.rows[0].LAST_SEQ) || 0;
+                let nextPortSeq = lastPortSeq + 1;
+
+                const rLastMov = await connection.execute(
+                    `
+          SELECT NVL(MAX(NUM_SEQ_DOCUM), 0) AS LAST_SEQ
+          FROM LOGIX.DOCUM_MOVTO
+          WHERE COD_EMPRESA   = :COD_EMPRESA
+            AND TRIM(NUM_DOCUM) = :NUM_DOCUM
+            AND IES_TIP_DOCUM = :IES_TIP_DOCUM
+        `,
+                    { COD_EMPRESA, NUM_DOCUM: num_docum, IES_TIP_DOCUM }
+                );
+                const lastMovSeq = Number(rLastMov.rows[0].LAST_SEQ) || 0;
+                let nextMovSeq = lastMovSeq + 1;
+
+                // saldo (último movto ou DOCUM)
+                let valSaldo = Number(VAL_SALDO_DOCUM) || 0;
+                const rSaldoLast = await connection.execute(
+                    `
+          SELECT VAL_SALDO
+          FROM (
+            SELECT VAL_SALDO
+            FROM LOGIX.DOCUM_MOVTO
+            WHERE COD_EMPRESA   = :COD_EMPRESA
+              AND TRIM(NUM_DOCUM) = :NUM_DOCUM
+              AND IES_TIP_DOCUM = :IES_TIP_DOCUM
+            ORDER BY NUM_SEQ_DOCUM DESC
+          ) WHERE ROWNUM = 1
+        `,
+                    { COD_EMPRESA, NUM_DOCUM: num_docum, IES_TIP_DOCUM }
+                );
+                if (rSaldoLast.rows.length > 0) {
+                    valSaldo = Number(rSaldoLast.rows[0].VAL_SALDO) || valSaldo;
+                }
+
+                // =========================
+                // DRY-RUN → retorna preview
+                // =========================
+                if (dryRun) {
+                    await connection.rollback();
+                    preview.push({
+                        num_docum: num_docum,
+                        empresa: COD_EMPRESA,
+                        tip_docum: IES_TIP_DOCUM,
+                        banco: temBanco ? "encontrado" : "não encontrado",
+                        last_seq_port: lastPortSeq,
+                        proximo_seq_port: nextPortSeq,
+                        last_seq_mov: lastMovSeq,
+                        proximo_seq_mov: nextMovSeq,
+                        saldo_movto: valSaldo,
+                        portador_orig: COD_PORTADOR_ORIG,
+                        tip_port_orig: IES_TIP_PORT_ORIG,
+                        portador_novo: codigoPortador,
+                        tip_port_novo: tipoPortador,
+                        ies_tip_cobr: iesTipCobr,
+                        cod_agencia: codAgencia,
+                        dig_agencia: digAgencia,
+                    });
+                    continue;
+                }
+
+                // 3.1) INSERT DOCUM_PORT (retry PK)
+                for (let tries = 0; tries < 10; tries++) {
+                    try {
+                        await connection.execute(
+                            `
+              INSERT INTO LOGIX.DOCUM_PORT
+                (COD_EMPRESA, NUM_DOCUM, IES_TIP_DOCUM, NUM_SEQ_DOCUM,
+                 DAT_ALTER_PORTADOR, IES_TIP_COBR, COD_PORTADOR, IES_TIP_PORTADOR,
+                 COD_AGENCIA, DIG_AGENCIA, DAT_ATUALIZ)
+              VALUES
+                (:COD_EMPRESA, :NUM_DOCUM, :IES_TIP_DOCUM, :NUM_SEQ_DOCUM,
+                 TRUNC(SYSDATE), :IES_TIP_COBR, :COD_PORTADOR, :IES_TIP_PORTADOR,
+                 :COD_AGENCIA, :DIG_AGENCIA, TRUNC(SYSDATE))
+            `,
+                            {
+                                COD_EMPRESA,
+                                NUM_DOCUM: num_docum,
+                                IES_TIP_DOCUM,
+                                NUM_SEQ_DOCUM: nextPortSeq,
+                                IES_TIP_COBR: iesTipCobr,
+                                COD_PORTADOR: codigoPortador,
+                                IES_TIP_PORTADOR: tipoPortador,
+                                COD_AGENCIA: codAgencia,
+                                DIG_AGENCIA: digAgencia,
+                            },
+                            { autoCommit: false }
+                        );
+                        break;
+                    } catch (e) {
+                        if (isUniqueViolation(e)) {
+                            nextPortSeq++;
+                            continue;
+                        }
+                        throw e;
+                    }
+                }
+
+                // 4) INSERT DOCUM_MOVTO (retry PK)
+                for (let tries = 0; tries < 10; tries++) {
+                    try {
+                        await connection.execute(
+                            `
+              INSERT INTO LOGIX.DOCUM_MOVTO
+                (COD_EMPRESA, NUM_DOCUM, IES_TIP_DOCUM, NUM_SEQ_DOCUM,
+                 DAT_MOVIMENTACAO, IES_SITUACAO,
+                 COD_PORTADOR_ATU, IES_TIP_PORT_ATU,
+                 COD_PORTADOR_ORIG, IES_TIP_PORT_ORIG,
+                 VAL_SALDO)
+              VALUES
+                (:COD_EMPRESA, :NUM_DOCUM, :IES_TIP_DOCUM, :NUM_SEQ_DOCUM,
+                 TRUNC(SYSDATE), 'AL',
+                 :COD_PORTADOR_ATU, :IES_TIP_PORT_ATU,
+                 :COD_PORTADOR_ORIG, :IES_TIP_PORT_ORIG,
+                 :VAL_SALDO)
+            `,
+                            {
+                                COD_EMPRESA,
+                                NUM_DOCUM: num_docum,
+                                IES_TIP_DOCUM,
+                                NUM_SEQ_DOCUM: nextMovSeq,
+                                COD_PORTADOR_ATU: codigoPortador,
+                                IES_TIP_PORT_ATU: tipoPortador,
+                                COD_PORTADOR_ORIG,
+                                IES_TIP_PORT_ORIG,
+                                VAL_SALDO: valSaldo,
+                            },
+                            { autoCommit: false }
+                        );
+                        break;
+                    } catch (e) {
+                        if (isUniqueViolation(e)) {
+                            nextMovSeq++;
+                            continue;
+                        }
+                        throw e;
+                    }
+                }
+
+                // 5) UPDATE DOCUM
+                await connection.execute(
+                    `
+          UPDATE LOGIX.DOCUM
+             SET COD_PORTADOR     = :COD_PORTADOR,
+                 IES_TIP_PORTADOR = :IES_TIP_PORTADOR
+           WHERE COD_EMPRESA = :COD_EMPRESA
+             AND TRIM(NUM_DOCUM) = :NUM_DOCUM
+        `,
+                    {
+                        COD_PORTADOR: codigoPortador,
+                        IES_TIP_PORTADOR: tipoPortador,
+                        COD_EMPRESA,
+                        NUM_DOCUM: num_docum,
+                    },
+                    { autoCommit: false }
+                );
+
+                await connection.commit();
+
+                // trava com TTL
+                lockKey(docKey, getUserKey(req));
+
+                alteradas.push({
+                    num_docum,
+                    empresa: COD_EMPRESA,
+                    tip_docum: IES_TIP_DOCUM,
+                    banco: temBanco ? "encontrado" : "não encontrado",
+                    saldo_movto: valSaldo,
+                    locked: true,
+                });
+            } catch (errDup) {
+                try {
+                    await connection.rollback();
+                } catch { }
+                console.error(`Erro ao ajustar duplicata ${num_docum}:`, errDup);
+                com_erro.push(num_docum);
+            }
         }
 
-        res.json({
+        return res.json({
             success: true,
-            message: `${rowsAffected} duplicata(s) atualizada(s) com sucesso!`,
-            alteradas: duplicatasLimpas.filter((d) => existentesSet.has(d.trim())),
+            mode: dryRun ? "dryRun" : "commit",
+            message: dryRun
+                ? "Simulação concluída. Nenhuma alteração gravada."
+                : "Processo de ajuste concluído.",
+            alteradas,
+            preview,
             nao_encontradas,
+            com_erro,
         });
     } catch (error) {
-        console.error("Erro ao ajustar portador:", error);
-        res
+        console.error("Erro geral em /ajustar:", error);
+        return res
             .status(500)
             .json({ success: false, message: "Erro interno do servidor." });
     } finally {

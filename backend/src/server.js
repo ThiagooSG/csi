@@ -9,7 +9,8 @@ const comissaoRoute = require("./routes/comissaoRoute");
 const portadorRoute = require("./routes/portadorRoute");
 const usuarioRoute = require("./routes/usuarioRoute");
 const perfilRoute = require("./routes/perfilRoute");
-const dashboardRoute = require("./routes/dashboardRoute"); // Rota do dashboard importada
+const dashboardRoute = require("./routes/dashboardRoute");
+const pcpRoute = require("./routes/pcpRoute");
 
 // 2. Inicialização do Express
 const app = express();
@@ -19,9 +20,9 @@ app.use(cookieParser());
 app.use(
   cors({
     origin: [
-      "http://localhost:5174",
-      "http://127.0.0.1:5174",
-      "http://10.10.2.141:5174",
+      "http://localhost:5179",
+      "http://127.0.0.1:5179",
+      "http://10.10.2.141:5179",
     ],
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
@@ -47,7 +48,8 @@ app.use("/api/comissao", comissaoRoute);
 app.use("/api/portador", portadorRoute);
 app.use("/api/usuarios", usuarioRoute);
 app.use("/api/perfis", perfilRoute);
-app.use("/api/dashboard", dashboardRoute); // Rota do dashboard registrada no local correto
+app.use("/api/dashboard", dashboardRoute);
+app.use("/api/pcp", pcpRoute);
 
 // Rota de teste
 app.get("/test", (req, res) => {
@@ -61,7 +63,7 @@ app.use((req, res) => {
 });
 
 // 5. Inicialização do servidor
-const PORT = process.env.PORT || 3010;
+const PORT = process.env.PORT || 3020;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Servidor rodando em http://localhost:${PORT}`);
 });

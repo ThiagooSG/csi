@@ -45,7 +45,6 @@ router.post("/pesquisar", authenticateToken, async (req, res) => {
         LEFT JOIN logix.REPRESENTANTE r2 ON r2.COD_REPRES = d.COD_REPRES_2
         LEFT JOIN logix.REPRESENTANTE r3 ON r3.COD_REPRES = d.COD_REPRES_3
         LEFT JOIN COMERCIAL.CLIENTE c ON d.COD_CLIENTE = c.CLIENTE
-        LEFT JOIN logix.PORTADOR p ON p.COD_PORTADOR = d.COD_PORTADOR
         WHERE TRIM(d.NUM_DOCUM) IN (${placeholders})
     `;
 

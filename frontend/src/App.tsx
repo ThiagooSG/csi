@@ -13,6 +13,7 @@ import "react-toastify/dist/ReactToastify.css";
 import Login from "./components/login/Login";
 import Home from "./components/home/Home";
 import Financeiro from "./components/financeiro/Financeiro";
+import PcpPage from "./components/pcp/PcpPage";
 import PrivateRoute from "./components/PrivateRoute";
 import PaginaAdmin from "./components/admin/PaginaAdmin";
 import ForgotPassword from "./components/login/ForgotPassword";
@@ -67,6 +68,14 @@ const App: React.FC = () => {
               <PaginaAdmin />
             </PrivateRoute>
           }
+        />
+
+        <Route path="/pcp" 
+        element={
+          <PrivateRoute>
+            <PcpPage />
+          </PrivateRoute>
+          } 
         />
 
         {/* Redireciona qualquer rota não encontrada para home */}

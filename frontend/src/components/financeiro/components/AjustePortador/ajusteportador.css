@@ -117,14 +117,42 @@
     gap: 0.5rem;
     transition: background-color 0.2s, transform 0.1s;
 }
-.ajuste-portador-btn.primary { background-color: #2563eb; }
-.ajuste-portador-btn.primary:hover { background-color: #1d4ed8; transform: translateY(-1px); }
-.ajuste-portador-btn.secondary { background-color: #64748b; }
-.ajuste-portador-btn.secondary:hover { background-color: #475569; transform: translateY(-1px); }
-.ajuste-portador-btn.tertiary { background-color: #f59e0b; }
-.ajuste-portador-btn.tertiary:hover { background-color: #d97706; }
-.ajuste-portador-btn.full-width { width: 100%; }
-.ajuste-portador-btn:disabled { background-color: #cbd5e1; cursor: not-allowed; transform: none; }
+
+.ajuste-portador-btn.primary {
+    background-color: #2563eb;
+}
+
+.ajuste-portador-btn.primary:hover {
+    background-color: #1d4ed8;
+    transform: translateY(-1px);
+}
+
+.ajuste-portador-btn.secondary {
+    background-color: #64748b;
+}
+
+.ajuste-portador-btn.secondary:hover {
+    background-color: #475569;
+    transform: translateY(-1px);
+}
+
+.ajuste-portador-btn.tertiary {
+    background-color: #f59e0b;
+}
+
+.ajuste-portador-btn.tertiary:hover {
+    background-color: #d97706;
+}
+
+.ajuste-portador-btn.full-width {
+    width: 100%;
+}
+
+.ajuste-portador-btn:disabled {
+    background-color: #cbd5e1;
+    cursor: not-allowed;
+    transform: none;
+}
 
 /* Tabela de Resultados */
 .ajuste-portador-table-card {
@@ -133,6 +161,7 @@
     overflow: hidden;
     margin-top: 1rem;
 }
+
 .ajuste-portador-table-header {
     display: flex;
     justify-content: space-between;
@@ -141,32 +170,121 @@
     background-color: #f8fafc;
     border-bottom: 1px solid #e2e8f0;
 }
-.ajuste-portador-table-header h3 { margin: 0; font-size: 1.1rem; }
-.ajuste-portador-table-wrapper { overflow-x: auto; max-height: 60vh; overflow-y: auto; }
-.ajuste-portador-table { width: 100%; border-collapse: collapse; }
-.ajuste-portador-table th, .ajuste-portador-table td {
+
+.ajuste-portador-table-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+}
+
+.ajuste-portador-table-wrapper {
+    overflow-x: auto;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.ajuste-portador-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.ajuste-portador-table th,
+.ajuste-portador-table td {
     padding: 0.8rem 1.2rem;
     text-align: left;
     border-bottom: 1px solid #f1f5f9;
     font-size: 0.85rem;
     white-space: nowrap;
 }
-.ajuste-portador-table th { font-size: 0.75rem; color: #64748b; text-transform: uppercase; background-color: #f8fafc; }
-.ajuste-portador-table td { color: #334155; }
-.ajuste-portador-table tbody tr:hover { background-color: #f1f5f9; }
-.ajuste-portador-table tr.adjusted { background-color: #e2e8f0 !important; color: #94a3b8; }
-.ajuste-portador-table tr.adjusted td { color: #94a3b8; }
+
+.ajuste-portador-table th {
+    font-size: 0.75rem;
+    color: #64748b;
+    text-transform: uppercase;
+    background-color: #f8fafc;
+}
+
+.ajuste-portador-table td {
+    color: #334155;
+}
+
+.ajuste-portador-table tbody tr:hover {
+    background-color: #f1f5f9;
+}
+
+.ajuste-portador-table tr.adjusted {
+    background-color: #e2e8f0 !important;
+    color: #94a3b8;
+}
+
+.ajuste-portador-table tr.adjusted td {
+    color: #94a3b8;
+}
 
 /* Estilos para o Modal de Liberação */
-.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0, 0, 0, 0.6); display: flex; justify-content: center; align-items: center; z-index: 1000; }
-.modal-content { background-color: #fff; padding: 2rem; border-radius: 1rem; width: 100%; max-width: 500px; }
-.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
-.modal-header h3 { margin: 0; font-size: 1.5rem; }
-.modal-close-btn { background: none; border: none; font-size: 2rem; cursor: pointer; }
-.release-list { max-height: 300px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 0.5rem; padding: 0.5rem; }
-.release-item { display: flex; align-items: center; padding: 0.5rem; }
-.release-item input { margin-right: 0.75rem; }
-.modal-footer { display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1.5rem; }
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background-color: #fff;
+    padding: 2rem;
+    border-radius: 1rem;
+    width: 100%;
+    max-width: 500px;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.modal-header h3 {
+    margin: 0;
+    font-size: 1.5rem;
+}
+
+.modal-close-btn {
+    background: none;
+    border: none;
+    font-size: 2rem;
+    cursor: pointer;
+}
+
+.release-list {
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    padding: 0.5rem;
+}
+
+.release-item {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem;
+}
+
+.release-item input {
+    margin-right: 0.75rem;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+    margin-top: 1.5rem;
+}
 
 /* ESTILOS ADICIONAIS PARA O MODAL DE CONFIRMAÇÃO */
 .confirmation-body {
@@ -185,7 +303,245 @@
     .ajuste-portador-controles-superiores {
         flex-direction: column;
     }
+
     .ajuste-portador-card {
         padding: 1.5rem 1rem;
     }
+}
+
+/* ===================== AJUSTES ADICIONAIS (append-only) ===================== */
+
+/* Modal de simulação MAIOR (o modal "normal" continua com max-width: 500px) */
+.modal-content.modal-xl {
+    width: min(1280px, 96vw);
+    max-width: 1280px;
+}
+
+/* Tabela do preview de simulação: não quebrar e rolar horizontal se precisar */
+.sim-table th,
+.sim-table td {
+    white-space: nowrap;
+}
+
+.modal-content .ajuste-portador-table-wrapper {
+    overflow-x: auto;
+}
+
+/* --------- Micro-interações (mantém seu visual, só adiciona sensação) --------- */
+@media (prefers-reduced-motion: no-preference) {
+
+    /* Botões: leve elevação no hover + compressão no press + ripple sutil */
+    .ajuste-portador-btn {
+        position: relative;
+        overflow: hidden;
+        /* p/ ripple */
+        transition:
+            transform .12s ease,
+            box-shadow .20s ease,
+            background-color .15s ease,
+            color .15s ease,
+            opacity .15s ease;
+        will-change: transform, box-shadow;
+    }
+
+    .ajuste-portador-btn:hover:not(:disabled) {
+        transform: translateY(-1px);
+        box-shadow: 0 10px 28px rgba(30, 41, 59, .12);
+    }
+
+    .ajuste-portador-btn:active:not(:disabled) {
+        transform: translateY(0) scale(.985);
+        box-shadow: 0 6px 18px rgba(30, 41, 59, .18);
+    }
+
+    /* Ripple central (CSS-only). Se quiser remover, comente este bloco ::after */
+    .ajuste-portador-btn::after {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 0;
+        height: 0;
+        background: rgba(255, 255, 255, .35);
+        border-radius: 50%;
+        transform: translate(-50%, -50%);
+        opacity: 0;
+        transition: width .35s ease, height .35s ease, opacity .40s ease;
+        pointer-events: none;
+    }
+
+    .ajuste-portador-btn:active::after {
+        width: 220%;
+        height: 220%;
+        opacity: .35;
+        transition: 0s;
+    }
+
+    /* Linhas da tabela: highlight suave no hover */
+    .ajuste-portador-table tbody tr {
+        transition: background-color .15s ease;
+    }
+
+    .ajuste-portador-table tbody tr:hover {
+        background-color: #eef2f7;
+        /* bem leve */
+    }
+}
+
+/* Foco acessível (inputs/seletores/botões) – não altera cores base */
+.ajuste-portador-btn:focus-visible,
+.ajuste-portador-input:focus-visible,
+.ajuste-portador-select:focus-visible,
+.ajuste-portador-textarea:focus-visible {
+    outline: 3px solid #93c5fd;
+    outline-offset: 2px;
+    box-shadow: 0 0 0 3px rgba(147, 197, 253, .35);
+}
+
+/* Opcional: cabeçalhos da simulação com siglas mais compactas em telas menores */
+@media (max-width: 640px) {
+    .sim-table th {
+        font-size: .8rem;
+    }
+}
+
+/* ====================== TOKENS DE ANIMAÇÃO (pode copiar 1:1 do Comissão) ====================== */
+/* Se quiser 100% idêntico ao "Ajuste Comissão", copie os valores dele para estes tokens abaixo. */
+:root {
+    --ajp-ease-out: cubic-bezier(.2, .8, .2, 1);
+    /* troque pelo easing do Comissão */
+    --ajp-shadow-hover: 0 10px 28px rgba(30, 41, 59, .12);
+    /* troque pelo shadow do Comissão */
+    --ajp-shadow-press: 0 6px 18px rgba(30, 41, 59, .18);
+    /* idem */
+    --ajp-press-scale: .985;
+}
+
+/* Microinterações (usam os tokens acima) */
+@media (prefers-reduced-motion: no-preference) {
+    .ajuste-portador-btn {
+        position: relative;
+        overflow: hidden;
+        transition:
+            transform .12s var(--ajp-ease-out),
+            box-shadow .20s var(--ajp-ease-out),
+            background-color .15s var(--ajp-ease-out),
+            color .15s var(--ajp-ease-out),
+            opacity .15s var(--ajp-ease-out);
+        will-change: transform, box-shadow;
+    }
+
+    .ajuste-portador-btn:hover:not(:disabled) {
+        transform: translateY(-1px);
+        box-shadow: var(--ajp-shadow-hover);
+    }
+
+    .ajuste-portador-btn:active:not(:disabled) {
+        transform: translateY(0) scale(var(--ajp-press-scale));
+        box-shadow: var(--ajp-shadow-press);
+    }
+
+    .ajuste-portador-btn::after {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 0;
+        height: 0;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, .35);
+        transform: translate(-50%, -50%);
+        opacity: 0;
+        transition: width .35s var(--ajp-ease-out), height .35s var(--ajp-ease-out), opacity .40s var(--ajp-ease-out);
+        pointer-events: none;
+    }
+
+    .ajuste-portador-btn:active::after {
+        width: 220%;
+        height: 220%;
+        opacity: .35;
+        transition: 0s;
+    }
+}
+
+/* Modal XL e tabela da simulação (já tínhamos, mantendo aqui por garantia) */
+.modal-content.modal-xl {
+    width: min(1280px, 96vw);
+    max-width: 1280px;
+}
+
+.sim-table th,
+.sim-table td {
+    white-space: nowrap;
+}
+
+.modal-content .ajuste-portador-table-wrapper {
+    overflow-x: auto;
+}
+
+/* ====== Opções avançadas (discretas) ====== */
+.ajp-advanced {
+    margin-top: 6px;
+}
+
+.ajp-advanced-toggle {
+    list-style: none;
+    cursor: pointer;
+    user-select: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    color: #6b7280;
+    /* cinza discreto */
+}
+
+.ajp-advanced-toggle::-webkit-details-marker {
+    display: none;
+}
+
+.ajp-advanced-toggle i {
+    font-size: 14px;
+}
+
+.ajp-advanced[open] .ajp-advanced-toggle {
+    color: #374151;
+}
+
+.ajp-advanced-panel {
+    margin-top: 8px;
+    padding: 10px;
+    border: 1px dashed #e5e7eb;
+    border-radius: 8px;
+    background: #f9fafb;
+}
+
+.ajp-advanced-row {
+    display: grid;
+    gap: 8px;
+}
+
+.ajp-advanced-label {
+    font-weight: 600;
+    color: #374151;
+}
+
+.ajp-advanced-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    align-items: center;
+}
+
+.ajp-advanced-apply {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: #374151;
+}
+
+.ajp-advanced-hint {
+    margin-top: 4px;
+    font-size: 12px;
+    color: #6b7280;
 }
