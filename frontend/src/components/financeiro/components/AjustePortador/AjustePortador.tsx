@@ -1,9 +1,9 @@
-import React, { useState, useCallback, useMemo, useEffect } from "react";
+import React, { useState, useCallback } from "react";
 import { apiGet, apiPost } from "../../../../utils/api";
 import { toastService } from "../../../../services/toastService";
 import "./ajusteportador.css";
 
-// --- Tipos ---
+/* ========================= Tipos ========================= */
 interface Duplicata {
     num_docum: string;
     cod_empresa: string;
@@ -12,117 +12,170 @@ interface Duplicata {
     nome_portador: string;
     tipo_portador: string;
 }
-interface Portador { nome: string; tipo: string; }
-interface Ajustada { cod_empresa: string; ies_tip_docum: string; num_docum: string; }
-
-interface PreviewItem {
+interface Portador {
+    nome: string;
+    tipo: string;
+}
+interface LockedDup {
     num_docum: string;
-    empresa: string;
+    cod_empresa: string;
+    tip_docum: string;
+    expires_in: number;
+}
+interface SimRow {
+    num_docum: string;
+    cod_empresa: string;
     tip_docum: string;
     banco: string;
-    last_seq_port: number;
-    proximo_seq_port: number;
-    last_seq_mov: number;
-    proximo_seq_mov: number;
-    saldo_movto: number;
-    portador_orig: string;
-    tip_port_orig: string;
-    portador_novo: string;
-    tip_port_novo: string;
-    ies_tip_cobr: string | null;
-    cod_agencia: string | null;
-    dig_agencia: string | null;
+    ult_seq_port: number;
+    prox_seq_port: number;
+    ult_seq_mov: number;
+    prox_seq_mov: number;
+    saldo: number;
+    port_orig: string;
+    tip_orig: string;
+    port_novo: string;
+    tip_novo: string;
 }
 
-// --- Helpers ---
-const makeKey = (a: Ajustada) =>
-    `${String(a.cod_empresa).trim()}|${String(a.ies_tip_docum).trim()}|${String(a.num_docum).trim()}`;
-
-const normalizeAjustada = (d: any): Ajustada => ({
-    cod_empresa: String(d.cod_empresa ?? d.COD_EMPRESA ?? d.empresa ?? ""),
-    ies_tip_docum: String(d.ies_tip_docum ?? d.IES_TIP_DOCUM ?? d.tip_docum ?? ""),
-    num_docum: String(d.num_docum ?? d.NUM_DOCUM ?? d.num ?? d.numero ?? ""),
-});
-
-// CSV builder (mesmos campos do preview)
-function buildCsvFromPreview(preview: PreviewItem[]) {
-    const headers = [
-        "DUPLICATA", "EMPRESA", "TIP.DOC", "BANCO",
-        "ULT.SEQ.PORT", "PROX.SEQ.PORT", "ULT.SEQ.MOV", "PROX.SEQ.MOV",
-        "SALDO", "PORT.ORIG", "TIP.ORIG", "PORT.NOVO", "TIP.NOVO",
-        "IES_TIP_COBR", "AGENCIA", "DIGITO"
-    ];
-    const rows = preview.map(p => [
-        p.num_docum, p.empresa, p.tip_docum, p.banco,
-        p.last_seq_port, p.proximo_seq_port, p.last_seq_mov, p.proximo_seq_mov,
-        p.saldo_movto, p.portador_orig, p.tip_port_orig, p.portador_novo, p.tip_port_novo,
-        p.ies_tip_cobr ?? "", p.cod_agencia ?? "", p.dig_agencia ?? ""
-    ]);
-    const esc = (v: any) => {
-        const s = (v ?? "").toString();
-        return /[;"\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-    };
-    const csv = [headers, ...rows].map(r => r.map(esc).join(";")).join("\r\n");
-    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `ajuste-portador-preview-${new Date().toISOString().replace(/[:T]/g, "-").slice(0, 19)}.csv`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-}
-
-// --- Modal: Liberar Duplicatas ---
-const ModalLiberarDuplicatas: React.FC<{
-    ajustadas: Ajustada[];
-    onClose: () => void;
-    onLiberarTodas: () => Promise<void>;
-    onLiberarSelecionadas: (selecionadasKeys: Set<string>) => Promise<void>;
-}> = ({ ajustadas, onClose, onLiberarTodas, onLiberarSelecionadas }) => {
-    const [selecionadas, setSelecionadas] = useState<Set<string>>(new Set());
-    const allChecked = ajustadas.length > 0 && selecionadas.size === ajustadas.length;
-
-    const toggleAll = () => setSelecionadas(allChecked ? new Set() : new Set(ajustadas.map(makeKey)));
-    const handleSelect = (key: string, isChecked: boolean) => {
-        const nova = new Set(selecionadas);
-        isChecked ? nova.add(key) : nova.delete(key);
-        setSelecionadas(nova);
-    };
+/* ========================= Modais ========================= */
+const ConfirmacaoAjusteModal: React.FC<{
+    onConfirm: () => void;
+    onCancel: () => void;
+    count: number;
+    codigoPortador: string;
+    portador: Portador | null;
+}> = ({ onConfirm, onCancel, count, codigoPortador, portador }) => {
+    const plural = count > 1 ? "s" : "";
+    const textoPortador = [
+        (codigoPortador || "").trim(),
+        portador?.nome,
+        portador?.tipo ? `(${portador.tipo})` : "",
+    ]
+        .filter(Boolean)
+        .join(" ");
 
     return (
         <div className="modal-overlay">
             <div className="modal-content">
                 <div className="modal-header">
-                    <h3>Liberar Duplicatas Ajustadas</h3>
-                    <button onClick={onClose} className="modal-close-btn">&times;</button>
+                    <h3>Confirmar Ajuste</h3>
+                    <button onClick={onCancel} className="modal-close-btn">
+                        &times;
+                    </button>
                 </div>
 
-                <div className="release-list">
-                    <div className="release-item">
-                        <input type="checkbox" id="release-all" checked={allChecked} onChange={toggleAll} />
-                        <label htmlFor="release-all"><strong>Selecionar todas</strong></label>
-                    </div>
-
-                    {ajustadas.map((dup) => {
-                        const key = makeKey(dup);
-                        return (
-                            <div key={key} className="release-item">
-                                <input
-                                    type="checkbox"
-                                    id={`release-${key}`}
-                                    checked={selecionadas.has(key)}
-                                    onChange={(e) => handleSelect(key, e.target.checked)}
-                                />
-                                <label htmlFor={`release-${key}`}>
-                                    {dup.num_docum || "(sem nº)"} &nbsp;|&nbsp; Emp: {dup.cod_empresa || "-"} &nbsp;|&nbsp; Tip: {dup.ies_tip_docum || "-"}
-                                </label>
-                            </div>
-                        );
-                    })}
+                <div className="confirmation-body">
+                    <p>
+                        Você deseja ajustar <strong>{count} duplicata{plural}</strong>{" "}
+                        mudando o portador para:
+                    </p>
+                    <p>
+                        <strong>{textoPortador}</strong>?
+                    </p>
                 </div>
 
                 <div className="modal-footer">
-                    <button className="ajuste-portador-btn secondary" onClick={onLiberarTodas}>Liberar Todas</button>
+                    <button className="ajuste-portador-btn secondary" onClick={onCancel}>
+                        Não
+                    </button>
+                    <button className="ajuste-portador-btn primary" onClick={onConfirm}>
+                        Sim, Confirmar
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const ModalLiberarDuplicatas: React.FC<{
+    locked: LockedDup[];
+    onClose: () => void;
+    onLiberarTodas: () => void;
+    onLiberarSelecionadas: (selecionadas: Set<string>) => void;
+}> = ({ locked, onClose, onLiberarTodas, onLiberarSelecionadas }) => {
+    const [selecionadas, setSelecionadas] = useState<Set<string>>(new Set());
+    const all = locked.length > 0 && selecionadas.size === locked.length;
+
+    const fmtTTL = (s: number) =>
+        `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+
+    return (
+        <div className="modal-overlay">
+            <div className="modal-content" style={{ maxWidth: 700 }}>
+                <div className="modal-header">
+                    <h3>Liberar Duplicatas Travadas</h3>
+                    <button onClick={onClose} className="modal-close-btn">
+                        &times;
+                    </button>
+                </div>
+
+                <div className="release-list">
+                    {locked.length === 0 ? (
+                        <div className="empty-muted">
+                            Nenhuma duplicata travada entre as listadas.
+                        </div>
+                    ) : (
+                        <>
+                            <div className="release-item head">
+                                <input
+                                    type="checkbox"
+                                    checked={all}
+                                    onChange={(e) =>
+                                        setSelecionadas(
+                                            e.target.checked
+                                                ? new Set(locked.map((l) => l.num_docum))
+                                                : new Set()
+                                        )
+                                    }
+                                />
+                                <span style={{ width: 180, fontWeight: 600 }}>Duplicata</span>
+                                <span style={{ width: 60, fontWeight: 600 }}>Emp.</span>
+                                <span style={{ width: 60, fontWeight: 600 }}>Tip.</span>
+                                <span style={{ width: 90, fontWeight: 600, textAlign: "right" }}>
+                                    TTL
+                                </span>
+                            </div>
+
+                            <div className="release-items-scroll">
+                                {locked.map((l) => (
+                                    <label key={l.num_docum} className="release-item">
+                                        <input
+                                            type="checkbox"
+                                            checked={selecionadas.has(l.num_docum)}
+                                            onChange={(e) => {
+                                                const n = new Set(selecionadas);
+                                                e.target.checked
+                                                    ? n.add(l.num_docum)
+                                                    : n.delete(l.num_docum);
+                                                setSelecionadas(n);
+                                            }}
+                                        />
+                                        <span style={{ width: 180 }}>{l.num_docum}</span>
+                                        <span style={{ width: 60 }}>{l.cod_empresa}</span>
+                                        <span style={{ width: 60 }}>{l.tip_docum}</span>
+                                        <span style={{ width: 90, textAlign: "right" }}>
+                                            {fmtTTL(l.expires_in)}
+                                        </span>
+                                    </label>
+                                ))}
+                            </div>
+                        </>
+                    )}
+                </div>
+
+                <div className="modal-footer">
+                    <button className="ajuste-portador-btn secondary" onClick={onClose}>
+                        Fechar
+                    </button>
+                    <div style={{ flex: 1 }} />
+                    <button
+                        className="ajuste-portador-btn tertiary"
+                        onClick={onLiberarTodas}
+                        disabled={locked.length === 0}
+                    >
+                        Liberar Todas
+                    </button>
                     <button
                         className="ajuste-portador-btn primary"
                         onClick={() => onLiberarSelecionadas(selecionadas)}
@@ -136,86 +189,99 @@ const ModalLiberarDuplicatas: React.FC<{
     );
 };
 
-// --- Modal: Confirmação ---
-const ConfirmacaoAjusteModal: React.FC<{
-    onConfirm: () => void;
-    onCancel: () => void;
-    count: number;
-    portador: Portador | null;
-}> = ({ onConfirm, onCancel, count, portador }) => (
-    <div className="modal-overlay">
-        <div className="modal-content">
-            <div className="modal-header">
-                <h3>Confirmar Ajuste</h3>
-                <button onClick={onCancel} className="modal-close-btn">&times;</button>
-            </div>
-            <div className="confirmation-body">
-                <p>Você tem certeza que deseja ajustar <strong>{count} duplicata(s)</strong> para o portador:</p>
-                <p><strong>{portador?.nome} ({portador?.tipo})</strong>?</p>
-            </div>
-            <div className="modal-footer">
-                <button className="ajuste-portador-btn secondary" onClick={onCancel}>Não</button>
-                <button className="ajuste-portador-btn primary" onClick={onConfirm}>Sim, Confirmar</button>
-            </div>
-        </div>
-    </div>
-);
-
-// --- Modal: Resultado da Simulação (maior + CSV) ---
-const ModalSimulacao: React.FC<{
-    preview: PreviewItem[];
+const SimulacaoModal: React.FC<{
+    open: boolean;
+    rows: SimRow[];
     onClose: () => void;
-}> = ({ preview, onClose }) => {
+}> = ({ open, rows, onClose }) => {
+    if (!open) return null;
+
+    const exportCsv = () => {
+        const header = [
+            "DUPLICATA",
+            "EMPRESA",
+            "TIP.DOC",
+            "BANCO",
+            "ULT.SEQ.PORT",
+            "PROX.SEQ.PORT",
+            "ULT.SEQ.MOV",
+            "PROX.SEQ.MOV",
+            "SALDO",
+            "PORT.ORIG",
+            "TIP.ORIG",
+            "PORT.NOVO",
+            "TIP.NOVO",
+        ];
+        const lines = rows.map((r) => [
+            r.num_docum,
+            r.cod_empresa,
+            r.tip_docum,
+            r.banco,
+            r.ult_seq_port,
+            r.prox_seq_port,
+            r.ult_seq_mov,
+            r.prox_seq_mov,
+            r.saldo,
+            r.port_orig,
+            r.tip_orig,
+            r.port_novo,
+            r.tip_novo,
+        ]);
+        const csv = [header.join(";"), ...lines.map((l) => l.join(";"))].join("\n");
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "simulacao_portador.csv";
+        a.click();
+        URL.revokeObjectURL(url);
+    };
 
     return (
         <div className="modal-overlay">
             <div className="modal-content modal-xl">
                 <div className="modal-header">
-                    <h3>Resultado da Simulação ({preview.length})</h3>
-                    <button onClick={onClose} className="modal-close-btn">&times;</button>
+                    <h3>Resultado da Simulação ({rows.length})</h3>
+                    <button onClick={onClose} className="modal-close-btn">
+                        &times;
+                    </button>
                 </div>
 
-                <div className="ajuste-portador-table-wrapper" style={{ maxHeight: 560 }}>
+                <div className="ajuste-portador-table-wrapper">
                     <table className="ajuste-portador-table sim-table">
                         <thead>
                             <tr>
-                                <th>DUPLICATA</th>
-                                <th>EMPRESA</th>
-                                <th>TIP.DOC</th>
-                                <th>BANCO</th>
-                                <th>ULT.SEQ.PORT</th>
-                                <th>PRÓX.SEQ.PORT</th>
-                                <th>ULT.SEQ.MOV</th>
-                                <th>PRÓX.SEQ.MOV</th>
-                                <th>SALDO</th>
-                                <th>PORT.ORIG</th>
-                                <th>TIP.ORIG</th>
-                                <th>PORT.NOVO</th>
-                                <th>TIP.NOVO</th>
-                                <th>IES_TIP_COBR</th>
-                                <th>AGENCIA</th>
-                                <th>DÍGITO</th>
+                                <th>Duplicata</th>
+                                <th>Empresa</th>
+                                <th>Tip.Doc</th>
+                                <th>Banco</th>
+                                <th>Ult.Seq.Port</th>
+                                <th>Próx.Seq.Port</th>
+                                <th>Ult.Seq.Mov</th>
+                                <th>Próx.Seq.Mov</th>
+                                <th>Saldo</th>
+                                <th>Port.Orig</th>
+                                <th>Tip.Orig</th>
+                                <th>Port.Novo</th>
+                                <th>Tip.Novo</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {preview.map((p, i) => (
-                                <tr key={`${p.num_docum}-${i}`}>
-                                    <td>{p.num_docum}</td>
-                                    <td>{p.empresa}</td>
-                                    <td>{p.tip_docum}</td>
-                                    <td>{p.banco}</td>
-                                    <td>{p.last_seq_port}</td>
-                                    <td>{p.proximo_seq_port}</td>
-                                    <td>{p.last_seq_mov}</td>
-                                    <td>{p.proximo_seq_mov}</td>
-                                    <td>{p.saldo_movto}</td>
-                                    <td>{p.portador_orig}</td>
-                                    <td>{p.tip_port_orig}</td>
-                                    <td>{p.portador_novo}</td>
-                                    <td>{p.tip_port_novo}</td>
-                                    <td>{p.ies_tip_cobr ?? ""}</td>
-                                    <td>{p.cod_agencia ?? ""}</td>
-                                    <td>{p.dig_agencia ?? ""}</td>
+                            {rows.map((r, i) => (
+                                <tr key={`${r.num_docum}-${i}`}>
+                                    <td>{r.num_docum}</td>
+                                    <td>{r.cod_empresa}</td>
+                                    <td>{r.tip_docum}</td>
+                                    <td>{r.banco}</td>
+                                    <td>{r.ult_seq_port}</td>
+                                    <td>{r.prox_seq_port}</td>
+                                    <td>{r.ult_seq_mov}</td>
+                                    <td>{r.prox_seq_mov}</td>
+                                    <td>{r.saldo}</td>
+                                    <td>{r.port_orig}</td>
+                                    <td>{r.tip_orig}</td>
+                                    <td>{r.port_novo}</td>
+                                    <td>{r.tip_novo}</td>
                                 </tr>
                             ))}
                         </tbody>
@@ -223,310 +289,453 @@ const ModalSimulacao: React.FC<{
                 </div>
 
                 <div className="modal-footer">
-                    <button className="ajuste-portador-btn tertiary" onClick={() => buildCsvFromPreview(preview)}>Exportar CSV</button>
-                    <button className="ajuste-portador-btn primary" onClick={onClose}>Fechar</button>
+                    <button className="ajuste-portador-btn tertiary" onClick={exportCsv}>
+                        <i className="fas fa-file-csv" /> Exportar CSV
+                    </button>
+                    <div style={{ flex: 1 }} />
+                    <button className="ajuste-portador-btn secondary" onClick={onClose}>
+                        Fechar
+                    </button>
                 </div>
             </div>
         </div>
     );
 };
 
-// --- Componente Principal ---
+/* ========================= Componente Principal ========================= */
 const AjustePortador: React.FC = () => {
     const [consultaInput, setConsultaInput] = useState("");
     const [codigoPortador, setCodigoPortador] = useState("");
     const [duplicatas, setDuplicatas] = useState<Duplicata[]>([]);
-    const [portadoresEncontrados, setPortadoresEncontrados] = useState<Portador[]>([]);
-    const [portadorSelecionado, setPortadorSelecionado] = useState<Portador | null>(null);
+    const [portadoresEncontrados, setPortadoresEncontrados] = useState<Portador[]>(
+        []
+    );
+    const [portadorSelecionado, setPortadorSelecionado] =
+        useState<Portador | null>(null);
+
     const [loading, setLoading] = useState(false);
-    const [duplicatasSelecionadas, setDuplicatasSelecionadas] = useState<Set<string>>(new Set());
+    const [duplicatasSelecionadas, setDuplicatasSelecionadas] = useState<
+        Set<string>
+    >(new Set());
+    const [duplicatasAjustadas, setDuplicatasAjustadas] = useState<Set<string>>(
+        new Set()
+    );
 
-    // Simulação
-    const [dryRun, setDryRun] = useState(false);
-    const [simPreview, setSimPreview] = useState<PreviewItem[]>([]);
-    const [isSimModalOpen, setIsSimModalOpen] = useState(false);
+    // simulação
+    const [simulate, setSimulate] = useState<boolean>(false);
+    const [simRows, setSimRows] = useState<SimRow[]>([]);
+    const [simOpen, setSimOpen] = useState(false);
 
-    // TTL UI
-    const [ttlSeconds, setTtlSeconds] = useState<number>(1800);
-    const [ttlApplyExisting, setTtlApplyExisting] = useState<boolean>(false);
-
-    // Travas reais
-    const [ajustadas, setAjustadas] = useState<Ajustada[]>([]);
-    const ajustadasNumsSet = useMemo(() => new Set(ajustadas.map((a) => a.num_docum)), [ajustadas]);
-
-    const [isReleaseModalOpen, setIsReleaseModalOpen] = useState(false);
+    // modal confirmar
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
 
-    const loadAjustadas = useCallback(async () => {
-        try {
-            const resp = await apiGet("/api/portador/ajustadas");
-            if (resp?.success && Array.isArray(resp.data?.duplicatas)) {
-                setAjustadas(resp.data.duplicatas.map(normalizeAjustada));
-            } else setAjustadas([]);
-        } catch { setAjustadas([]); }
-    }, []);
+    // liberar duplicatas
+    const [isReleaseModalOpen, setIsReleaseModalOpen] = useState(false);
+    const [lockedServer, setLockedServer] = useState<LockedDup[]>([]);
 
-    const loadTtl = useCallback(async () => {
-        try {
-            const r = await apiGet("/api/portador/ttl");
-            if (r?.success && r.data?.ttl_seconds) setTtlSeconds(Number(r.data.ttl_seconds));
-        } catch { }
-    }, []);
+    // opções avançadas (TTL)
+    const [ttlSeconds, setTtlSeconds] = useState<number>(1800);
+    const [applyExistingLocks, setApplyExistingLocks] = useState<boolean>(false);
 
-    useEffect(() => { loadAjustadas(); loadTtl(); }, [loadAjustadas, loadTtl]);
-
+    /* ------------ helpers ------------ */
     const atualizarTabela = useCallback(async () => {
-        const lst = consultaInput.split(/[\n,]+/).map((d) => d.trim()).filter(Boolean);
-        if (lst.length === 0) return;
+        const lista = consultaInput
+            .split(/[\n,]+/)
+            .map((d) => d.trim())
+            .filter(Boolean);
+        if (lista.length === 0) return;
         try {
-            const r = await apiPost("/api/portador/pesquisar", { duplicatas: lst });
+            const r = await apiPost("/api/portador/pesquisar", {
+                duplicatas: lista,
+            });
             if (r.success && r.data?.rows) {
                 setDuplicatas(r.data.rows);
-                await loadAjustadas();
+                const vis = new Set<string>(
+                    r.data.rows.map((x: Duplicata) => x.num_docum)
+                );
+                setDuplicatasAjustadas(
+                    (prev) => new Set([...prev].filter((n) => vis.has(n)))
+                );
             }
-        } catch (e) { console.error(e); }
-    }, [consultaInput, loadAjustadas]);
+        } catch (e) {
+            console.error(e);
+        }
+    }, [consultaInput]);
 
+    /* ------------ ações ------------ */
     const handlePesquisar = async () => {
-        setDuplicatas([]); setDuplicatasSelecionadas(new Set());
-        const lst = consultaInput.split(/[\n,]+/).map((d) => d.trim()).filter(Boolean);
-        if (lst.length === 0) return;
+        setDuplicatas([]);
+        setDuplicatasSelecionadas(new Set());
+
+        const lista = consultaInput
+            .split(/[\n,]+/)
+            .map((d) => d.trim())
+            .filter(Boolean);
+        if (lista.length === 0) return;
 
         setLoading(true);
         try {
-            const r = await apiPost("/api/portador/pesquisar", { duplicatas: lst });
+            const r = await apiPost("/api/portador/pesquisar", {
+                duplicatas: lista,
+            });
             if (r.success && r.data?.rows) {
-                toastService.success(`${r.data.encontradas?.length || 0} duplicata(s) encontrada(s).`);
-                const n = r.data.nao_encontradas?.length || 0;
-                if (n > 0) toastService.warn(`${n} duplicata(s) não encontrada(s).`);
+                const ok = r.data.encontradas?.length || 0;
+                const nok = r.data.nao_encontradas?.length || 0;
+                toastService.success(`${ok} duplicata(s) encontrada(s).`);
+                if (nok > 0)
+                    toastService.warn(`${nok} duplicata(s) não encontrada(s).`);
                 setDuplicatas(r.data.rows);
-                await loadAjustadas();
+                const vis = new Set<string>(
+                    r.data.rows.map((x: Duplicata) => x.num_docum)
+                );
+                setDuplicatasAjustadas(
+                    (prev) => new Set([...prev].filter((n) => vis.has(n)))
+                );
             } else {
                 toastService.error(r.message || "Nenhuma duplicata encontrada.");
-                setAjustadas([]);
+                setDuplicatasAjustadas(new Set());
             }
-        } catch {
+        } catch (err) {
             toastService.error("Erro de conexão ao pesquisar.");
-        } finally { setLoading(false); }
+            console.error(err);
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleBuscarPortador = async () => {
         if (!codigoPortador.trim()) {
-            setPortadoresEncontrados([]); setPortadorSelecionado(null); return;
+            setPortadoresEncontrados([]);
+            setPortadorSelecionado(null);
+            return;
         }
         setLoading(true);
         try {
             const r = await apiGet(`/api/portador/obter-dados/${codigoPortador}`);
             if (r.success && r.data?.portadores?.length) {
-                const L = r.data.portadores; setPortadoresEncontrados(L);
-                setPortadorSelecionado(L.length === 1 ? L[0] : null);
+                const ps: Portador[] = r.data.portadores;
+                setPortadoresEncontrados(ps);
+                setPortadorSelecionado(ps.length === 1 ? ps[0] : null);
             } else {
                 toastService.error(r.message || "Portador não encontrado.");
-                setPortadoresEncontrados([]); setPortadorSelecionado(null);
+                setPortadoresEncontrados([]);
+                setPortadorSelecionado(null);
             }
-        } catch {
+        } catch (err) {
             toastService.error("Erro ao buscar portador.");
-            setPortadoresEncontrados([]); setPortadorSelecionado(null);
-        } finally { setLoading(false); }
+            console.error(err);
+            setPortadoresEncontrados([]);
+            setPortadorSelecionado(null);
+        } finally {
+            setLoading(false);
+        }
     };
 
-    const handleAjustarPortador = () => {
-        if (duplicatasSelecionadas.size > 0 && portadorSelecionado) setIsConfirmModalOpen(true);
-    };
-
-    // Exportar CSV direto da Tabela Principal (usa dry-run para obter preview)
-    const exportarCsvTabelaPrincipal = async () => {
+    const runSimulacao = async () => {
+        const lista = Array.from(duplicatasSelecionadas);
+        if (lista.length === 0 || !codigoPortador || !portadorSelecionado) {
+            toastService.warn("Selecione duplicatas e um portador válido para simular.");
+            return;
+        }
+        setLoading(true);
         try {
-            if (!portadorSelecionado || !codigoPortador) {
-                toastService.warn("Informe o novo portador e tipo antes de exportar.");
-                return;
-            }
-            const docs = Array.from(duplicatasSelecionadas.size ? duplicatasSelecionadas : new Set(duplicatas.map(d => d.num_docum)));
-            if (docs.length === 0) {
-                toastService.warn("Nenhuma duplicata para exportar.");
-                return;
-            }
             const r = await apiPost("/api/portador/ajustar", {
-                duplicatas: docs,
+                duplicatas: lista,
                 codigoPortador,
                 tipoPortador: portadorSelecionado.tipo,
                 dryRun: true,
             });
-            const preview: PreviewItem[] = Array.isArray(r?.data?.preview) ? r.data.preview : [];
-            if (preview.length === 0) {
-                toastService.warn("Nada a exportar.");
-                return;
+
+            if (r.success) {
+                const preview: any[] = r.data?.preview || r.data?.alteradas || [];
+                const rows: SimRow[] = preview.map((p: any) => {
+                    const num_docum = String(p.num_docum ?? p.NUM_DOCUM ?? "");
+                    const cod_empresa = String(
+                        p.cod_empresa ?? p.COD_EMPRESA ?? p.empresa ?? p.EMPRESA ?? ""
+                    );
+                    const tip_docum = String(p.tip_docum ?? p.IES_TIP_DOCUM ?? "DP");
+                    const banco = String(p.banco ?? p.BANCO ?? "não encontrado");
+                    const ult_seq_port = Number(p.ult_seq_port ?? p.ULT_SEQ_PORT ?? 0);
+                    const prox_seq_port = Number(
+                        p.prox_seq_port ?? p.PROX_SEQ_PORT ?? ult_seq_port + 1
+                    );
+                    const ult_seq_mov = Number(p.ult_seq_mov ?? p.ULT_SEQ_MOV ?? 0);
+                    const prox_seq_mov = Number(
+                        p.prox_seq_mov ?? p.PROX_SEQ_MOV ?? ult_seq_mov + 1
+                    );
+                    const saldo = Number(p.saldo ?? p.SALDO ?? 0);
+                    const port_orig = String(p.port_orig ?? p.PORT_ORIG ?? "");
+                    const tip_orig = String(p.tip_orig ?? p.TIP_ORIG ?? "");
+                    const port_novo = String(p.port_novo ?? codigoPortador);
+                    const tip_novo = String(p.tip_novo ?? portadorSelecionado.tipo);
+
+                    return {
+                        num_docum,
+                        cod_empresa,
+                        tip_docum,
+                        banco,
+                        ult_seq_port,
+                        prox_seq_port,
+                        ult_seq_mov,
+                        prox_seq_mov,
+                        saldo,
+                        port_orig,
+                        tip_orig,
+                        port_novo,
+                        tip_novo,
+                    };
+                });
+                setSimRows(rows);
+                setSimOpen(true);
+            } else {
+                toastService.error(r.message || "Falha na simulação.");
             }
-            buildCsvFromPreview(preview);
-            toastService.success(`Exportado CSV (${preview.length} linha(s)).`);
-        } catch (e) {
-            toastService.error("Falha ao gerar CSV.");
-            console.error(e);
+        } catch (err) {
+            console.error(err);
+            toastService.error("Erro ao simular ajuste.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleAjustarClick = () => {
+        if (simulate) {
+            runSimulacao();
+        } else {
+            if (duplicatasSelecionadas.size > 0 && portadorSelecionado) {
+                setIsConfirmModalOpen(true);
+            }
         }
     };
 
     const executeAjuste = async () => {
         setIsConfirmModalOpen(false);
-        const docs = Array.from(duplicatasSelecionadas);
-        if (docs.length === 0 || !codigoPortador || !portadorSelecionado) return;
+        const lista = Array.from(duplicatasSelecionadas);
+        if (lista.length === 0 || !codigoPortador || !portadorSelecionado) return;
 
         setLoading(true);
         try {
             const r = await apiPost("/api/portador/ajustar", {
-                duplicatas: docs,
+                duplicatas: lista,
                 codigoPortador,
                 tipoPortador: portadorSelecionado.tipo,
-                dryRun,
+                dryRun: false,
             });
 
-            // DRY-RUN → abre modal com preview
-            if (r?.success && r.data?.mode === "dryRun") {
-                const preview = Array.isArray(r.data?.preview) ? (r.data.preview as PreviewItem[]) : [];
-                setSimPreview(preview);
-                setIsSimModalOpen(true);
-                toastService.info(`Simulação: ${preview.length} duplicata(s). Nenhuma alteração gravada.`);
-                return;
-            }
+            if (r.success) {
+                const ok = r.data?.alteradas?.length || 0;
+                const ignoradas = r.data?.ignoradas?.length || 0;
+                const erros = r.data?.com_erro?.length || 0;
 
-            // sucesso
-            if (r?.success && Array.isArray(r.data?.alteradas)) {
-                toastService.success(`${r.data.alteradas.length} duplicata(s) ajustada(s) com sucesso!`);
-                const novas = (r.data.alteradas as any[]).map((a) =>
-                    normalizeAjustada({
-                        cod_empresa: a.empresa ?? a.cod_empresa,
-                        ies_tip_docum: a.tip_docum ?? a.ies_tip_docum,
-                        num_docum: a.num_docum,
-                    })
-                );
-                setAjustadas(prev => {
-                    const map = new Map(prev.map(x => [makeKey(x), x]));
-                    for (const n of novas) map.set(makeKey(n), n);
-                    return Array.from(map.values());
-                });
+                if (ok > 0) {
+                    toastService.success(`${ok} duplicata(s) ajustada(s).`);
+                    const numsOk: string[] = (r.data.alteradas || []).map(
+                        (a: any) => a.num_docum
+                    );
+                    setDuplicatasAjustadas((prev) => new Set([...prev, ...numsOk]));
+                }
+                if (ignoradas > 0) toastService.warn(`${ignoradas} ignorada(s).`);
+                if (erros > 0) toastService.error(`${erros} com erro.`);
+
                 setDuplicatasSelecionadas(new Set());
                 await atualizarTabela();
-                return;
-            }
-
-            // bloqueio 423
-            if (r?.status === 423) {
-                const dup = r?.duplicata ?? r?.data?.duplicata;
-                if (dup) {
-                    const n = normalizeAjustada(dup);
-                    setAjustadas(prev => {
-                        const map = new Map(prev.map(x => [makeKey(x), x]));
-                        map.set(makeKey(n), n); return Array.from(map.values());
-                    });
-                }
-                toastService.warn(r?.message || "Há duplicata(s) travada(s). Libere para novo ajuste.");
-                setIsReleaseModalOpen(true);
-                return;
-            }
-
-            toastService.error(r?.message || "Falha no ajuste.");
-        } catch (err: any) {
-            const status = err?.response?.status ?? err?.status;
-            if (status === 423) {
-                const dup = err?.response?.data?.duplicata;
-                if (dup) {
-                    const n = normalizeAjustada(dup);
-                    setAjustadas(prev => {
-                        const map = new Map(prev.map(x => [makeKey(x), x]));
-                        map.set(makeKey(n), n); return Array.from(map.values());
-                    });
-                }
-                toastService.warn(err?.response?.data?.message || "Há duplicata(s) travada(s). Libere para novo ajuste.");
-                setIsReleaseModalOpen(true);
             } else {
-                toastService.error("Erro de conexão ao ajustar.");
-                console.error(err);
+                toastService.error(r.message || "Falha no ajuste.");
             }
-        } finally { setLoading(false); }
+        } catch (err) {
+            toastService.error("Erro de conexão ao ajustar.");
+            console.error(err);
+        } finally {
+            setLoading(false);
+        }
     };
 
-    // TTL handlers
-    const aplicarTtl = async () => {
-        const s = Number(ttlSeconds);
-        if (!Number.isFinite(s) || s < 60 || s > 86400) {
-            toastService.warn("TTL inválido (60–86400).");
-            return;
-        }
+    /* ------------ liberar duplicatas (locks) ------------ */
+    const openReleaseModal = async () => {
         try {
-            const r = await apiPost("/api/portador/ttl", { seconds: s, applyToExisting: ttlApplyExisting });
-            if (r?.success) {
-                toastService.success(`TTL ajustado para ${r.data?.ttl_seconds || s}s${ttlApplyExisting ? " (aplicado às travas atuais)" : ""}.`);
-            } else {
-                toastService.error(r?.message || "Falha ao ajustar TTL.");
+            const nums = duplicatas.map((d) => d.num_docum).filter(Boolean);
+            if (nums.length === 0) {
+                toastService.info("Não há duplicatas na lista atual.");
+                return;
             }
-        } catch (e) {
-            toastService.error("Erro ao ajustar TTL.");
-            console.error(e);
+            const qs = encodeURIComponent(nums.join(","));
+            const r = await apiGet(`/api/portador/ajustadas?nums=${qs}`);
+            if (r.success) {
+                const items: LockedDup[] = (r.data?.items || []).map((i: any) => ({
+                    num_docum: String(i.num_docum),
+                    cod_empresa: String(i.cod_empresa ?? ""),
+                    tip_docum: String(i.tip_docum ?? ""),
+                    expires_in: Number(i.expires_in ?? 0),
+                }));
+                setLockedServer(items);
+                setIsReleaseModalOpen(true);
+            } else {
+                toastService.error(r.message || "Falha ao consultar travas.");
+            }
+        } catch (err) {
+            console.error(err);
+            toastService.error("Erro ao consultar travas.");
         }
     };
-
-    const abrirModalLiberar = async () => { await loadAjustadas(); setIsReleaseModalOpen(true); };
 
     const handleLiberarTodas = async () => {
         try {
-            const r = await apiPost("/api/portador/liberar", { todas: true });
-            if (r.success) {
-                toastService.success("Todas as duplicatas foram liberadas.");
-                await loadAjustadas(); setIsReleaseModalOpen(false); await atualizarTabela();
-            } else {
-                toastService.error(r.message || "Falha ao liberar duplicatas.");
+            const nums = lockedServer.map((l) => l.num_docum);
+            if (nums.length === 0) {
+                setIsReleaseModalOpen(false);
+                return;
             }
-        } catch { toastService.error("Erro ao liberar duplicatas."); }
+            const r = await apiPost("/api/portador/liberar", { duplicatas: nums });
+            if (r.success) {
+                setDuplicatasAjustadas((prev) => {
+                    const n = new Set(prev);
+                    nums.forEach((x) => n.delete(x));
+                    return n;
+                });
+                toastService.success("Travas liberadas.");
+                setIsReleaseModalOpen(false);
+                setLockedServer([]);
+            } else {
+                toastService.error(r.message || "Falha ao liberar travas.");
+            }
+        } catch (err) {
+            console.error(err);
+            toastService.error("Erro ao liberar travas.");
+        }
     };
 
-    const handleLiberarSelecionadas = async (selecionadasKeys: Set<string>) => {
+    const handleLiberarSelecionadas = async (selecionadas: Set<string>) => {
         try {
-            const wanted = new Set(selecionadasKeys);
-            const payload = ajustadas
-                .filter((a) => wanted.has(makeKey(a)))
-                .map((a) => ({ cod_empresa: a.cod_empresa, ies_tip_docum: a.ies_tip_docum, num_docum: a.num_docum }));
-            const r = await apiPost("/api/portador/liberar", { duplicatas: payload });
+            const nums = Array.from(selecionadas);
+            if (nums.length === 0) return;
+            const r = await apiPost("/api/portador/liberar", { duplicatas: nums });
             if (r.success) {
-                toastService.success("Duplicata(s) liberada(s).");
-                await loadAjustadas(); setIsReleaseModalOpen(false); await atualizarTabela();
+                setDuplicatasAjustadas((prev) => {
+                    const n = new Set(prev);
+                    nums.forEach((x) => n.delete(x));
+                    return n;
+                });
+                toastService.success(`Travas liberadas (${nums.length}).`);
+                setLockedServer((prev) =>
+                    prev.filter((l) => !selecionadas.has(l.num_docum))
+                );
             } else {
-                toastService.error(r.message || "Falha ao liberar duplicatas.");
+                toastService.error(r.message || "Falha ao liberar as selecionadas.");
             }
-        } catch { toastService.error("Erro ao liberar duplicatas."); }
+        } catch (err) {
+            console.error(err);
+            toastService.error("Erro ao liberar selecionadas.");
+        }
     };
 
+    /* ------------ Opções avançadas: TTL ------------ */
+    const applyTtl = async () => {
+        try {
+            if (!ttlSeconds || ttlSeconds <= 0) {
+                toastService.warn("Informe um TTL (segundos) válido.");
+                return;
+            }
+            const r = await apiPost("/api/portador/locks/ttl", {
+                ttlSeconds,
+                applyExisting: applyExistingLocks,
+            });
+            if (r.success) {
+                toastService.success("Configuração de TTL aplicada.");
+            } else {
+                toastService.error(r.message || "Falha ao aplicar TTL.");
+            }
+        } catch (err) {
+            console.error(err);
+            toastService.error("Erro ao aplicar TTL.");
+        }
+    };
+
+    /* ------------ utilidades UI ------------ */
     const handleLimpar = () => {
-        setConsultaInput(""); setCodigoPortador(""); setDuplicatas([]);
-        setPortadoresEncontrados([]); setPortadorSelecionado(null);
-        setDuplicatasSelecionadas(new Set()); setAjustadas([]);
-        setDryRun(false); setSimPreview([]); setIsSimModalOpen(false);
+        setConsultaInput("");
+        setCodigoPortador("");
+        setDuplicatas([]);
+        setPortadoresEncontrados([]);
+        setPortadorSelecionado(null);
+        setDuplicatasSelecionadas(new Set());
+        setDuplicatasAjustadas(new Set());
     };
 
     const handleSelectAll = () => {
-        const candidates = duplicatas.filter(d => !ajustadasNumsSet.has(d.num_docum));
-        const all = duplicatasSelecionadas.size === candidates.length && candidates.length > 0;
-        setDuplicatasSelecionadas(all ? new Set() : new Set(candidates.map(d => d.num_docum)));
-    };
-    const handleSelectRow = (num: string, c: boolean) => {
-        const s = new Set(duplicatasSelecionadas);
-        c ? s.add(num) : s.delete(num);
-        setDuplicatasSelecionadas(s);
+        const selecionaveis = duplicatas.filter(
+            (d) => !duplicatasAjustadas.has(d.num_docum)
+        );
+        const all =
+            selecionaveis.length > 0 &&
+            duplicatasSelecionadas.size === selecionaveis.length;
+        setDuplicatasSelecionadas(
+            all ? new Set() : new Set(selecionaveis.map((d) => d.num_docum))
+        );
     };
 
-    const ajustadasCount = ajustadas.length;
-    const candidates = duplicatas.filter(d => !ajustadasNumsSet.has(d.num_docum));
-    const allSelectableChecked = candidates.length > 0 && duplicatasSelecionadas.size === candidates.length;
+    const handleSelectRow = (num: string, checked: boolean) => {
+        const n = new Set(duplicatasSelecionadas);
+        checked ? n.add(num) : n.delete(num);
+        setDuplicatasSelecionadas(n);
+    };
 
+    const handleExportCsv = () => {
+        if (duplicatas.length === 0) {
+            toastService.info("Nada para exportar.");
+            return;
+        }
+        const header = [
+            "NUMERO",
+            "EMPRESA",
+            "CLIENTE",
+            "PORTADOR_ATUAL",
+            "TIPO_ATUAL",
+        ];
+        const rows = duplicatas.map((d) => [
+            d.num_docum,
+            d.cod_empresa,
+            (d.nome_cliente || "").replaceAll(";", ","),
+            `${d.cod_portador} - ${(d.nome_portador || "").replaceAll(";", ",")}`,
+            d.tipo_portador || "",
+        ]);
+        const csv = [header.join(";"), ...rows.map((r) => r.join(";"))].join("\n");
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "duplicatas.csv";
+        a.click();
+        URL.revokeObjectURL(url);
+    };
+
+    const selecionaveis = duplicatas.filter(
+        (d) => !duplicatasAjustadas.has(d.num_docum)
+    );
+    const allSelectable =
+        selecionaveis.length > 0 &&
+        duplicatasSelecionadas.size === selecionaveis.length;
+
+    /* ========================= Render ========================= */
     return (
         <div className="ajuste-portador-card">
             <div className="ajuste-portador-header">
-                <i className="fas fa-university" style={{ marginRight: '1rem', color: '#2563eb' }}></i>
+                <i
+                    className="fas fa-university"
+                    style={{ marginRight: "1rem", color: "#2563eb" }}
+                />
                 <span className="ajuste-portador-title">Ajuste do Portador</span>
             </div>
 
             <div className="ajuste-portador-container">
                 <div className="ajuste-portador-controles-superiores">
+                    {/* Painel esquerda */}
                     <div className="ajuste-portador-painel-consulta">
-                        <label className="ajuste-portador-label" htmlFor="consulta-duplicatas">Consultar Duplicatas</label>
+                        <label
+                            className="ajuste-portador-label"
+                            htmlFor="consulta-duplicatas"
+                        >
+                            Consultar Duplicatas
+                        </label>
                         <textarea
                             id="consulta-duplicatas"
                             value={consultaInput}
@@ -535,21 +744,31 @@ const AjustePortador: React.FC = () => {
                             className="ajuste-portador-textarea"
                             disabled={loading}
                         />
-                        <button className="ajuste-portador-btn primary" onClick={handlePesquisar} disabled={loading || !consultaInput.trim()}>
-                            <i className="fas fa-search"></i> Consultar
+                        <button
+                            className="ajuste-portador-btn primary"
+                            onClick={handlePesquisar}
+                            disabled={loading || !consultaInput.trim()}
+                        >
+                            <i className="fas fa-search" /> Consultar
                         </button>
                     </div>
 
+                    {/* Painel direita */}
                     <div className="ajuste-portador-painel-ajuste">
                         <div className="ajuste-portador-ajuste-section">
-                            <label className="ajuste-portador-label" htmlFor="codigo-portador">Código do Novo Portador</label>
+                            <label
+                                className="ajuste-portador-label"
+                                htmlFor="codigo-portador"
+                            >
+                                Código do Novo Portador
+                            </label>
                             <input
                                 id="codigo-portador"
                                 type="text"
                                 value={codigoPortador}
                                 onChange={(e) => setCodigoPortador(e.target.value)}
                                 onBlur={handleBuscarPortador}
-                                placeholder="Ex: 123"
+                                placeholder="Ex: 900"
                                 className="ajuste-portador-input"
                                 disabled={loading}
                             />
@@ -562,116 +781,163 @@ const AjustePortador: React.FC = () => {
 
                             {portadoresEncontrados.length > 1 && (
                                 <>
-                                    <label className="ajuste-portador-label" htmlFor="tipo-portador">Selecione o Tipo</label>
+                                    <label
+                                        className="ajuste-portador-label"
+                                        htmlFor="tipo-portador"
+                                    >
+                                        Selecione o Tipo
+                                    </label>
                                     <select
                                         id="tipo-portador"
                                         value={portadorSelecionado?.tipo || ""}
-                                        onChange={(e) => setPortadorSelecionado(portadoresEncontrados.find((p) => p.tipo === e.target.value) || null)}
+                                        onChange={(e) =>
+                                            setPortadorSelecionado(
+                                                portadoresEncontrados.find(
+                                                    (p) => p.tipo === e.target.value
+                                                ) || null
+                                            )
+                                        }
                                         className="ajuste-portador-select"
                                         disabled={loading}
                                     >
                                         <option value="">Selecione...</option>
                                         {portadoresEncontrados.map((p, i) => (
-                                            <option key={`${p.tipo}-${i}`} value={p.tipo}>{p.nome} ({p.tipo})</option>
+                                            <option key={`${p.tipo}-${i}`} value={p.tipo}>
+                                                {p.nome} ({p.tipo})
+                                            </option>
                                         ))}
                                     </select>
                                 </>
                             )}
 
-                            {/* Simular (dry-run) + Opções avançadas */}
-                            <div style={{ display: "grid", gap: 8 }}>
-                                <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            {/* Simular + Opções Avançadas */}
+                            <div style={{ marginTop: 8 }}>
+                                <label
+                                    style={{
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        gap: 8,
+                                        cursor: "pointer",
+                                    }}
+                                >
                                     <input
-                                        id="dry-run"
                                         type="checkbox"
-                                        checked={dryRun}
-                                        onChange={(e) => setDryRun(e.target.checked)}
+                                        checked={simulate}
+                                        onChange={(e) => setSimulate(e.target.checked)}
                                         disabled={loading}
                                     />
                                     <span>Simular (sem gravar)</span>
                                 </label>
-
-                                {/* Opções avançadas (colapsadas por padrão) */}
-                                <details className="ajp-advanced">
-                                    <summary className="ajp-advanced-toggle">
-                                        <i className="fas fa-cog"></i> Opções avançadas
-                                    </summary>
-
-                                    <div className="ajp-advanced-panel">
-                                        <div className="ajp-advanced-row">
-                                            <div className="ajp-advanced-label">TTL das travas (segundos)</div>
-
-                                            <div className="ajp-advanced-controls">
-                                                <input
-                                                    type="number"
-                                                    min={60}
-                                                    max={86400}
-                                                    step={60}
-                                                    value={ttlSeconds}
-                                                    onChange={(e) => setTtlSeconds(Number(e.target.value))}
-                                                    className="ajuste-portador-input"
-                                                    style={{ maxWidth: 140 }}
-                                                />
-
-                                                <label className="ajp-advanced-apply">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={ttlApplyExisting}
-                                                        onChange={(e) => setTtlApplyExisting(e.target.checked)}
-                                                    />
-                                                    <span>Aplicar nas travas atuais</span>
-                                                </label>
-
-                                                <button className="ajuste-portador-btn tertiary" onClick={aplicarTtl}>
-                                                    Aplicar TTL
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                        <div className="ajp-advanced-hint">
-                                            Raramente necessário. O padrão vem do servidor.
-                                        </div>
-                                    </div>
-                                </details>
                             </div>
 
+                            <details className="ajp-advanced" style={{ marginTop: 6 }}>
+                                <summary className="ajp-advanced-toggle">
+                                    <i className="fas fa-cog" /> Opções avançadas
+                                </summary>
+                                <div className="ajp-advanced-panel">
+                                    <div className="ajp-advanced-row">
+                                        <label className="ajp-advanced-label">
+                                            TTL das travas (segundos)
+                                        </label>
+                                        <div className="ajp-advanced-controls">
+                                            <input
+                                                type="number"
+                                                min={60}
+                                                value={ttlSeconds}
+                                                onChange={(e) => setTtlSeconds(Number(e.target.value))}
+                                                className="ajuste-portador-input"
+                                                style={{ maxWidth: 160 }}
+                                            />
+                                            <label className="ajp-advanced-apply">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={applyExistingLocks}
+                                                    onChange={(e) =>
+                                                        setApplyExistingLocks(e.target.checked)
+                                                    }
+                                                    style={{ marginRight: 6 }}
+                                                />
+                                                Aplicar nas travas atuais
+                                            </label>
+                                            <button
+                                                className="ajuste-portador-btn tertiary"
+                                                onClick={applyTtl}
+                                            >
+                                                Aplicar TTL
+                                            </button>
+                                        </div>
+                                        <div className="ajp-advanced-hint">
+                                            Por padrão vale só para novas travas. Marque a opção para
+                                            revalidar as travas abertas agora.
+                                        </div>
+                                    </div>
+                                </div>
+                            </details>
+
                             <hr />
+
                             <button
                                 className="ajuste-portador-btn primary full-width"
-                                onClick={handleAjustarPortador}
-                                disabled={loading || duplicatasSelecionadas.size === 0 || !portadorSelecionado}
+                                onClick={handleAjustarClick}
+                                disabled={
+                                    loading ||
+                                    duplicatasSelecionadas.size === 0 ||
+                                    !portadorSelecionado
+                                }
                             >
-                                <i className="fas fa-exchange-alt"></i> {dryRun ? "Simular" : "Ajustar"} ({duplicatasSelecionadas.size})
+                                <i className="fas fa-exchange-alt" />{" "}
+                                {simulate ? "Simular" : "Ajustar"} ({duplicatasSelecionadas.size}){" "}
+                                Selecionada(s)
                             </button>
-                            <button className="ajuste-portador-btn secondary full-width" onClick={handleLimpar} disabled={loading}>
-                                <i className="fas fa-eraser"></i> Limpar Tudo
+
+                            <button
+                                className="ajuste-portador-btn secondary full-width"
+                                onClick={handleLimpar}
+                                disabled={loading}
+                            >
+                                <i className="fas fa-eraser" /> Limpar Tudo
                             </button>
                         </div>
                     </div>
                 </div>
 
+                {/* Tabela */}
                 {duplicatas.length > 0 && (
                     <div className="ajuste-portador-table-card">
                         <div className="ajuste-portador-table-header">
                             <h3>
-                                Duplicatas Encontradas ({duplicatas.length}) | Selecionadas ({duplicatasSelecionadas.size}) | Ajustadas ({ajustadasCount})
+                                Duplicatas Encontradas ({duplicatas.length}) | Selecionadas (
+                                {duplicatasSelecionadas.size}) | Ajustadas (
+                                {duplicatasAjustadas.size})
                             </h3>
-                            <div style={{ display: "flex", gap: 8 }}>
-                                <button className="ajuste-portador-btn tertiary" onClick={exportarCsvTabelaPrincipal}>
-                                    <i className="fas fa-file-csv"></i> Exportar CSV
+                            <div style={{ display: "flex", gap: 10 }}>
+                                <button
+                                    className="ajuste-portador-btn tertiary"
+                                    onClick={openReleaseModal}
+                                >
+                                    <i className="fas fa-unlock" /> Liberar Duplicatas
                                 </button>
-                                {ajustadasCount > 0 && (
-                                    <button className="ajuste-portador-btn tertiary" onClick={abrirModalLiberar}>
-                                        <i className="fas fa-unlock"></i> Liberar Duplicatas
-                                    </button>
-                                )}
+                                <button
+                                    className="ajuste-portador-btn export"
+                                    onClick={handleExportCsv}
+                                >
+                                    <i className="fas fa-file-csv" /> Exportar CSV
+                                </button>
                             </div>
                         </div>
+
                         <div className="ajuste-portador-table-wrapper">
                             <table className="ajuste-portador-table">
                                 <thead>
                                     <tr>
-                                        <th><input type="checkbox" onChange={handleSelectAll} checked={allSelectableChecked} disabled={candidates.length === 0} /></th>
+                                        <th>
+                                            <input
+                                                type="checkbox"
+                                                onChange={handleSelectAll}
+                                                checked={allSelectable}
+                                                disabled={selecionaveis.length === 0}
+                                            />
+                                        </th>
                                         <th>Nº Duplicata</th>
                                         <th>Empresa</th>
                                         <th>Cliente</th>
@@ -681,15 +947,20 @@ const AjustePortador: React.FC = () => {
                                 </thead>
                                 <tbody>
                                     {duplicatas.map((d, idx) => {
-                                        const isAdjusted = ajustadasNumsSet.has(d.num_docum);
+                                        const travada = duplicatasAjustadas.has(d.num_docum);
                                         return (
-                                            <tr key={`${d.num_docum}-${idx}`} className={isAdjusted ? "adjusted" : ""}>
+                                            <tr
+                                                key={`${d.num_docum}-${idx}`}
+                                                className={travada ? "adjusted" : ""}
+                                            >
                                                 <td>
                                                     <input
                                                         type="checkbox"
                                                         checked={duplicatasSelecionadas.has(d.num_docum)}
-                                                        onChange={(e) => handleSelectRow(d.num_docum, e.target.checked)}
-                                                        disabled={isAdjusted}
+                                                        onChange={(e) =>
+                                                            handleSelectRow(d.num_docum, e.target.checked)
+                                                        }
+                                                        disabled={travada}
                                                     />
                                                 </td>
                                                 <td>{d.num_docum}</td>
@@ -707,30 +978,34 @@ const AjustePortador: React.FC = () => {
                 )}
             </div>
 
-            {isReleaseModalOpen && (
-                <ModalLiberarDuplicatas
-                    ajustadas={ajustadas}
-                    onClose={() => setIsReleaseModalOpen(false)}
-                    onLiberarTodas={handleLiberarTodas}
-                    onLiberarSelecionadas={handleLiberarSelecionadas}
-                />
-            )}
-
+            {/* Modais */}
             {isConfirmModalOpen && (
                 <ConfirmacaoAjusteModal
                     onConfirm={executeAjuste}
                     onCancel={() => setIsConfirmModalOpen(false)}
                     count={duplicatasSelecionadas.size}
+                    codigoPortador={codigoPortador}
                     portador={portadorSelecionado}
                 />
             )}
 
-            {isSimModalOpen && (
-                <ModalSimulacao
-                    preview={simPreview}
-                    onClose={() => setIsSimModalOpen(false)}
+            {isReleaseModalOpen && (
+                <ModalLiberarDuplicatas
+                    locked={lockedServer}
+                    onClose={() => {
+                        setIsReleaseModalOpen(false);
+                        setLockedServer([]);
+                    }}
+                    onLiberarTodas={handleLiberarTodas}
+                    onLiberarSelecionadas={handleLiberarSelecionadas}
                 />
             )}
+
+            <SimulacaoModal
+                open={simOpen}
+                rows={simRows}
+                onClose={() => setSimOpen(false)}
+            />
         </div>
     );
 };

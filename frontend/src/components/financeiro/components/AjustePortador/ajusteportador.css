@@ -115,7 +115,7 @@
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    transition: background-color 0.2s, transform 0.1s;
+    transition: background-color 0.2s, transform 0.1s, box-shadow .2s;
 }
 
 .ajuste-portador-btn.primary {
@@ -144,6 +144,18 @@
     background-color: #d97706;
 }
 
+/* NOVO: botão export no header da tabela */
+.ajuste-portador-btn.export {
+    background: #ffffff;
+    color: #1f2937;
+    border: 1px solid #e2e8f0;
+}
+
+.ajuste-portador-btn.export:hover {
+    box-shadow: 0 8px 24px rgba(2, 6, 23, .08);
+    transform: translateY(-1px);
+}
+
 .ajuste-portador-btn.full-width {
     width: 100%;
 }
@@ -152,6 +164,7 @@
     background-color: #cbd5e1;
     cursor: not-allowed;
     transform: none;
+    box-shadow: none;
 }
 
 /* Tabela de Resultados */
@@ -174,6 +187,13 @@
 .ajuste-portador-table-header h3 {
     margin: 0;
     font-size: 1.1rem;
+}
+
+/* NOVO: ações à direita no header */
+.right-actions {
+    display: flex;
+    gap: .625rem;
+    align-items: center;
 }
 
 .ajuste-portador-table-wrapper {
@@ -269,6 +289,25 @@
     padding: 0.5rem;
 }
 
+/* NOVO: cabeçalho e scroll da lista do modal */
+.release-item.head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 10px;
+    border-bottom: 1px solid #e2e8f0;
+    font-weight: 700;
+    color: #111827;
+}
+
+.release-items-scroll {
+    max-height: 300px;
+    overflow: auto;
+    border: 1px solid #e2e8f0;
+    border-top: none;
+    border-radius: 0 0 .5rem .5rem;
+}
+
 .release-item {
     display: flex;
     align-items: center;
@@ -277,6 +316,11 @@
 
 .release-item input {
     margin-right: 0.75rem;
+}
+
+.empty-muted {
+    color: #6b7280;
+    padding: .5rem 0;
 }
 
 .modal-footer {
@@ -327,23 +371,8 @@
     overflow-x: auto;
 }
 
-/* --------- Micro-interações (mantém seu visual, só adiciona sensação) --------- */
+/* --------- Micro-interações (mantém seu visual) --------- */
 @media (prefers-reduced-motion: no-preference) {
-
-    /* Botões: leve elevação no hover + compressão no press + ripple sutil */
-    .ajuste-portador-btn {
-        position: relative;
-        overflow: hidden;
-        /* p/ ripple */
-        transition:
-            transform .12s ease,
-            box-shadow .20s ease,
-            background-color .15s ease,
-            color .15s ease,
-            opacity .15s ease;
-        will-change: transform, box-shadow;
-    }
-
     .ajuste-portador-btn:hover:not(:disabled) {
         transform: translateY(-1px);
         box-shadow: 0 10px 28px rgba(30, 41, 59, .12);
@@ -354,41 +383,16 @@
         box-shadow: 0 6px 18px rgba(30, 41, 59, .18);
     }
 
-    /* Ripple central (CSS-only). Se quiser remover, comente este bloco ::after */
-    .ajuste-portador-btn::after {
-        content: "";
-        position: absolute;
-        left: 50%;
-        top: 50%;
-        width: 0;
-        height: 0;
-        background: rgba(255, 255, 255, .35);
-        border-radius: 50%;
-        transform: translate(-50%, -50%);
-        opacity: 0;
-        transition: width .35s ease, height .35s ease, opacity .40s ease;
-        pointer-events: none;
-    }
-
-    .ajuste-portador-btn:active::after {
-        width: 220%;
-        height: 220%;
-        opacity: .35;
-        transition: 0s;
-    }
-
-    /* Linhas da tabela: highlight suave no hover */
     .ajuste-portador-table tbody tr {
         transition: background-color .15s ease;
     }
 
     .ajuste-portador-table tbody tr:hover {
         background-color: #eef2f7;
-        /* bem leve */
     }
 }
 
-/* Foco acessível (inputs/seletores/botões) – não altera cores base */
+/* Foco acessível */
 .ajuste-portador-btn:focus-visible,
 .ajuste-portador-input:focus-visible,
 .ajuste-portador-select:focus-visible,
@@ -396,87 +400,6 @@
     outline: 3px solid #93c5fd;
     outline-offset: 2px;
     box-shadow: 0 0 0 3px rgba(147, 197, 253, .35);
-}
-
-/* Opcional: cabeçalhos da simulação com siglas mais compactas em telas menores */
-@media (max-width: 640px) {
-    .sim-table th {
-        font-size: .8rem;
-    }
-}
-
-/* ====================== TOKENS DE ANIMAÇÃO (pode copiar 1:1 do Comissão) ====================== */
-/* Se quiser 100% idêntico ao "Ajuste Comissão", copie os valores dele para estes tokens abaixo. */
-:root {
-    --ajp-ease-out: cubic-bezier(.2, .8, .2, 1);
-    /* troque pelo easing do Comissão */
-    --ajp-shadow-hover: 0 10px 28px rgba(30, 41, 59, .12);
-    /* troque pelo shadow do Comissão */
-    --ajp-shadow-press: 0 6px 18px rgba(30, 41, 59, .18);
-    /* idem */
-    --ajp-press-scale: .985;
-}
-
-/* Microinterações (usam os tokens acima) */
-@media (prefers-reduced-motion: no-preference) {
-    .ajuste-portador-btn {
-        position: relative;
-        overflow: hidden;
-        transition:
-            transform .12s var(--ajp-ease-out),
-            box-shadow .20s var(--ajp-ease-out),
-            background-color .15s var(--ajp-ease-out),
-            color .15s var(--ajp-ease-out),
-            opacity .15s var(--ajp-ease-out);
-        will-change: transform, box-shadow;
-    }
-
-    .ajuste-portador-btn:hover:not(:disabled) {
-        transform: translateY(-1px);
-        box-shadow: var(--ajp-shadow-hover);
-    }
-
-    .ajuste-portador-btn:active:not(:disabled) {
-        transform: translateY(0) scale(var(--ajp-press-scale));
-        box-shadow: var(--ajp-shadow-press);
-    }
-
-    .ajuste-portador-btn::after {
-        content: "";
-        position: absolute;
-        left: 50%;
-        top: 50%;
-        width: 0;
-        height: 0;
-        border-radius: 50%;
-        background: rgba(255, 255, 255, .35);
-        transform: translate(-50%, -50%);
-        opacity: 0;
-        transition: width .35s var(--ajp-ease-out), height .35s var(--ajp-ease-out), opacity .40s var(--ajp-ease-out);
-        pointer-events: none;
-    }
-
-    .ajuste-portador-btn:active::after {
-        width: 220%;
-        height: 220%;
-        opacity: .35;
-        transition: 0s;
-    }
-}
-
-/* Modal XL e tabela da simulação (já tínhamos, mantendo aqui por garantia) */
-.modal-content.modal-xl {
-    width: min(1280px, 96vw);
-    max-width: 1280px;
-}
-
-.sim-table th,
-.sim-table td {
-    white-space: nowrap;
-}
-
-.modal-content .ajuste-portador-table-wrapper {
-    overflow-x: auto;
 }
 
 /* ====== Opções avançadas (discretas) ====== */
@@ -493,7 +416,6 @@
     gap: 8px;
     font-weight: 600;
     color: #6b7280;
-    /* cinza discreto */
 }
 
 .ajp-advanced-toggle::-webkit-details-marker {
@@ -544,4 +466,63 @@
     margin-top: 4px;
     font-size: 12px;
     color: #6b7280;
+}
+
+/* (animação citada na sua folha) */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ========= FIX: força o layout 2 colunas exatamente como antes ========= */
+.ajuste-portador-card .ajuste-portador-controles-superiores {
+    display: flex !important;
+    /* garante que não será sobrescrito */
+    gap: 2rem;
+    align-items: flex-start;
+    width: 100%;
+}
+
+/* Coluna ESQUERDA (consulta) ocupa o restante */
+.ajuste-portador-card .ajuste-portador-painel-consulta {
+    flex: 1 1 auto !important;
+    min-width: 0;
+    /* evita estourar e empurrar a direita pra baixo */
+}
+
+/* Coluna DIREITA (painel do portador) com largura fixa semelhante ao original */
+.ajuste-portador-card .ajuste-portador-painel-ajuste {
+    flex: 0 0 420px !important;
+    /* base fixa */
+    max-width: 420px !important;
+}
+
+/* Botão "Consultar" não deve esticar além da coluna esquerda */
+.ajuste-portador-card .ajuste-portador-painel-consulta .ajuste-portador-btn.primary {
+    width: 100%;
+}
+
+/* Em telas menores volta a empilhar (como já era) */
+@media (max-width: 1024px) {
+    .ajuste-portador-card .ajuste-portador-controles-superiores {
+        flex-direction: column !important;
+    }
+
+    .ajuste-portador-card .ajuste-portador-painel-ajuste {
+        flex: 1 1 auto !important;
+        max-width: none !important;
+    }
+}
+
+/* (opcional) deixa o textarea mais “fluido” dentro da coluna esquerda */
+.ajuste-portador-card .ajuste-portador-textarea {
+    width: 100%;
+    max-width: 100%;
 }
